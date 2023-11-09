@@ -284,7 +284,7 @@ Visualization Manager:
           Size (Pixels): 5
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /rolo_sam/feature/cloud_corner
+          Topic: /rolo/feature/cloud_corner
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -312,7 +312,7 @@ Visualization Manager:
           Size (Pixels): 3
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /rolo_sam/feature/cloud_surface
+          Topic: /rolo/feature/cloud_surface
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -340,7 +340,7 @@ Visualization Manager:
           Size (Pixels): 5
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /rolo_sam/feature/cloud_groud
+          Topic: /rolo/feature/cloud_groud
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -374,7 +374,7 @@ Visualization Manager:
           Size (Pixels): 2
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /rolo_sam/mapping/cloud_registered
+          Topic: /rolo/mapping/cloud_registered
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -402,7 +402,7 @@ Visualization Manager:
           Size (Pixels): 2
           Size (m): 0.10000000149011612
           Style: Flat Squares
-          Topic: /rolo_sam/mapping/map_local
+          Topic: /rolo/mapping/map_local
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -432,7 +432,7 @@ Visualization Manager:
           Size (Pixels): 3
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /rolo_sam/mapping/map_global
+          Topic: /rolo/mapping/map_global
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -457,7 +457,7 @@ Visualization Manager:
           Radius: 0.029999999329447746
           Shaft Diameter: 0.10000000149011612
           Shaft Length: 0.10000000149011612
-          Topic: /rolo_sam/mapping/path
+          Topic: /rolo/mapping/path
           Unreliable: false
           Value: true
         - Alpha: 1
@@ -480,7 +480,7 @@ Visualization Manager:
           Radius: 0.029999999329447746
           Shaft Diameter: 0.10000000149011612
           Shaft Length: 0.10000000149011612
-          Topic: /rolo_sam/lidar_odometry/path
+          Topic: /rolo/lidar_odometry/path
           Unreliable: false
           Value: true
         - Alpha: 1
@@ -506,14 +506,14 @@ Visualization Manager:
           Size (Pixels): 2
           Size (m): 0.30000001192092896
           Style: Flat Squares
-          Topic: /rolo_sam/mapping/icp_loop_closure_corrected_cloud
+          Topic: /rolo/mapping/icp_loop_closure_corrected_cloud
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
           Value: false
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /rolo_sam/mapping/loop_closure_constraints
+          Marker Topic: /rolo/mapping/loop_closure_constraints
           Name: Loop constraint
           Namespaces:
             {}
@@ -523,7 +523,7 @@ Visualization Manager:
       Name: Mapping
     - Class: rviz/Image
       Enabled: false
-      Image Topic: /rolo_sam/range_image
+      Image Topic: /rolo/range_image
       Max Value: 1
       Median window: 5
       Min Value: 0

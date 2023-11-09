@@ -1,6 +1,6 @@
-#include "rolo_sam/utility.h"
+#include "rolo/utility.h"
 
-#include "rolo_sam/CloudInfoStamp.h"
+#include "rolo/CloudInfoStamp.h"
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/Image.h>
 
@@ -68,7 +68,7 @@ private:
 
     cv::Mat rangeMat;   // 将一帧点云平铺，形成一个矩阵，行数为扫瞄线数，列数由水平扫描角度求得
 
-    rolo_sam::CloudInfoStamp cloudInfoStamp;
+    rolo::CloudInfoStamp cloudInfoStamp;
     double timeScanCur; // 当前帧第一个点扫描的时间
     double timeScanEnd; // 当前帧最后一个点扫描的时间
     std_msgs::Header cloudHeader;
@@ -84,8 +84,8 @@ public:
         subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(pointCloudTopic, 10, &ImageProjection::cloudHandler, this, ros::TransportHints().tcpNoDelay());
         // 输出：cloud_info
         // cloud_info为从去畸变点云中提取的有效点云信息：行列数，距离和坐标，方便后续提取特征
-        pubLaserCloudInfo = nh.advertise<rolo_sam::CloudInfoStamp> ("rolo_sam/cloud_info", 1);
-        pubLaserRangeImg = nh.advertise<sensor_msgs::Image> ("rolo_sam/range_image", 1);
+        pubLaserCloudInfo = nh.advertise<rolo::CloudInfoStamp> ("rolo/cloud_info", 1);
+        pubLaserRangeImg = nh.advertise<sensor_msgs::Image> ("rolo/range_image", 1);
         // 重置各变量，初始化
         allocateMemory();
         resetParameters();

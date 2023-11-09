@@ -16,9 +16,6 @@
     <!--- Robot State TF -->
     <!-- <include file="$(find rolo)/launch/include/module_robot_state_publisher.launch" /> -->
 
-    <!--- Run Navsat -->
-    <!-- <include file="$(find rolo)/launch/include/module_navsat.launch" /> -->
-
     <!--- Run Rviz-->
     <include file="$(find rolo)/launch/module_rviz.launch" />
 

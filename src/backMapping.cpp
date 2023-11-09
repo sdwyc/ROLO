@@ -1,5 +1,5 @@
-#include "rolo_sam/utility.h"
-// #include "rolo_sam/save_map.h"
+#include "rolo/utility.h"
+// #include "rolo/save_map.h"
 
 #include <gtsam/geometry/Rot3.h>
 #include <gtsam/geometry/Pose3.h>
@@ -79,7 +79,7 @@ public:
     ros::ServiceServer srvSaveMap;
 
     std::deque<nav_msgs::Odometry> gpsQueue;
-    rolo_sam::CloudInfoStamp cloudInfo;
+    rolo::CloudInfoStamp cloudInfo;
 
     vector<pcl::PointCloud<PointType>::Ptr> cornerCloudKeyFrames;   // 所有关键帧的角点集合（降采样）
     vector<pcl::PointCloud<PointType>::Ptr> surfCloudKeyFrames; // 所有关键帧的平面点集合（降采样）
@@ -158,32 +158,32 @@ public:
         parameters.relinearizeSkip = 1;
         isam = new ISAM2(parameters); // 实例化ISAM
 
-        pubKeyPoses                 = nh.advertise<sensor_msgs::PointCloud2>("rolo_sam/mapping/trajectory", 1);  // 全局路径
-        pubLaserCloudSurround       = nh.advertise<sensor_msgs::PointCloud2>("rolo_sam/mapping/map_global", 1);  // 全局地图
-        pubLaserOdometryGlobal      = nh.advertise<nav_msgs::Odometry> ("rolo_sam/mapping/odometry", 1);         // 里程计
-        pubLaserOdometryIncremental = nh.advertise<nav_msgs::Odometry> ("rolo_sam/mapping/odometry_incremental", 1);
-        pubPath                     = nh.advertise<nav_msgs::Path>("rolo_sam/mapping/path", 1);  // 全局路径
+        pubKeyPoses                 = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/trajectory", 1);  // 全局路径
+        pubLaserCloudSurround       = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/map_global", 1);  // 全局地图
+        pubLaserOdometryGlobal      = nh.advertise<nav_msgs::Odometry> ("rolo/mapping/odometry", 1);         // 里程计
+        pubLaserOdometryIncremental = nh.advertise<nav_msgs::Odometry> ("rolo/mapping/odometry_incremental", 1);
+        pubPath                     = nh.advertise<nav_msgs::Path>("rolo/mapping/path", 1);  // 全局路径
         // Feature extration传过来的cloud_info
-        subCloud = nh.subscribe<rolo_sam::CloudInfoStamp>(odomTopic+"/cloud_info", 1, &backMapping::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
+        subCloud = nh.subscribe<rolo::CloudInfoStamp>(odomTopic+"/cloud_info", 1, &backMapping::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
         // GPS数据
         // subGPS   = nh.subscribe<nav_msgs::Odometry> (gpsTopic, 200, &backMapping::gpsHandler, this, ros::TransportHints().tcpNoDelay());
         // 回环数据
         // subLoop  = nh.subscribe<std_msgs::Float64MultiArray>("lio_loop/loop_closure_detection", 1, &backMapping::loopInfoHandler, this, ros::TransportHints().tcpNoDelay());
 
-        // srvSaveMap  = nh.advertiseService("rolo_sam/save_map", &backMapping::saveMapService, this);
+        // srvSaveMap  = nh.advertiseService("rolo/save_map", &backMapping::saveMapService, this);
 
         // 历史关键帧点云
-        pubHistoryKeyFrames   = nh.advertise<sensor_msgs::PointCloud2>("rolo_sam/mapping/icp_loop_closure_history_cloud", 1);
+        pubHistoryKeyFrames   = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/icp_loop_closure_history_cloud", 1);
         // 关联关键帧点云
-        pubIcpKeyFrames       = nh.advertise<sensor_msgs::PointCloud2>("rolo_sam/mapping/icp_loop_closure_corrected_cloud", 1);
-        pubLoopConstraintEdge = nh.advertise<visualization_msgs::MarkerArray>("/rolo_sam/mapping/loop_closure_constraints", 1);
+        pubIcpKeyFrames       = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/icp_loop_closure_corrected_cloud", 1);
+        pubLoopConstraintEdge = nh.advertise<visualization_msgs::MarkerArray>("/rolo/mapping/loop_closure_constraints", 1);
         //  局部地图
-        pubRecentKeyFrames    = nh.advertise<sensor_msgs::PointCloud2>("rolo_sam/mapping/map_local", 1);
+        pubRecentKeyFrames    = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/map_local", 1);
         // 当前关键帧
-        pubRecentKeyFrame     = nh.advertise<sensor_msgs::PointCloud2>("rolo_sam/mapping/cloud_registered", 1);
-        pubCloudRegisteredRaw = nh.advertise<sensor_msgs::PointCloud2>("rolo_sam/mapping/cloud_registered_raw", 1);
+        pubRecentKeyFrame     = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/cloud_registered", 1);
+        pubCloudRegisteredRaw = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/cloud_registered_raw", 1);
 
-        pubSLAMInfo           = nh.advertise<rolo_sam::CloudInfoStamp>("rolo_sam/mapping/slam_info", 1);
+        pubSLAMInfo           = nh.advertise<rolo::CloudInfoStamp>("rolo/mapping/slam_info", 1);
 
         downSizeFilterCorner.setLeafSize(mappingCornerLeafSize, mappingCornerLeafSize, mappingCornerLeafSize);
         downSizeFilterSurf.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
@@ -312,7 +312,7 @@ public:
     }
 
     //! 激光回调函数，
-    void laserCloudInfoHandler(const rolo_sam::CloudInfoStampConstPtr& msgIn){
+    void laserCloudInfoHandler(const rolo::CloudInfoStampConstPtr& msgIn){
         // extract time stamp 提取时间戳
         timeLaserInfoStamp = msgIn->header.stamp;
         timeLaserInfoCur = msgIn->header.stamp.toSec();
@@ -1188,29 +1188,7 @@ public:
             increOdomAffine = increOdomAffine * affineIncre;
             float x, y, z, roll, pitch, yaw;
             pcl::getTranslationAndEulerAngles (increOdomAffine, x, y, z, roll, pitch, yaw);
-            // 与IMU数据进行加权融合
-            // if (cloudInfo.imuAvailable == true)
-            // {
-            //     if (std::abs(cloudInfo.imuPitchInit) < 1.4)
-            //     {
-            //         double imuWeight = 0.1;
-            //         tf::Quaternion imuQuaternion;
-            //         tf::Quaternion transformQuaternion;
-            //         double rollMid, pitchMid, yawMid;
 
-            //         // slerp roll
-            //         transformQuaternion.setRPY(roll, 0, 0);
-            //         imuQuaternion.setRPY(cloudInfo.imuRollInit, 0, 0);
-            //         tf::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
-            //         roll = rollMid;
-
-            //         // slerp pitch
-            //         transformQuaternion.setRPY(0, pitch, 0);
-            //         imuQuaternion.setRPY(0, cloudInfo.imuPitchInit, 0);
-            //         tf::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
-            //         pitch = pitchMid;
-            //     }
-            // }
             //发布位姿变换消息
             laserOdomIncremental.header.stamp = timeLaserInfoStamp;
             laserOdomIncremental.header.frame_id = odometryFrame;
@@ -1653,7 +1631,7 @@ public:
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "rolo_sam");
+    ros::init(argc, argv, "rolo");
     // 实例化后端优化类
     backMapping BM;
 
