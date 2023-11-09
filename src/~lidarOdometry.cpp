@@ -1,5 +1,5 @@
-#include "rolo_sam/utility.h"
-#include "rolo_sam/undirected_graph.h"
+#include "rolo/utility.h"
+#include "rolo/undirected_graph.h"
 #include "std_msgs/Float64MultiArray.h"
 #include <gtsam/geometry/Rot3.h>
 #include <gtsam/geometry/Pose3.h>
@@ -42,7 +42,7 @@ private:
     // 当前帧数据
     Matrix<double, 3, Dynamic> MatCloudInfoLast;
     Matrix<int, 2, Dynamic> TI_map_last;
-    rolo_sam::CloudInfoStamp laserCloudInfoLast;
+    rolo::CloudInfoStamp laserCloudInfoLast;
     pcl::PointCloud<PointType>::Ptr FullCloudLast;
     pcl::PointCloud<PointType>::Ptr CloudCornerLast;
     pcl::PointCloud<PointType>::Ptr CloudSurfLast;
@@ -54,7 +54,7 @@ private:
     // 上一帧数据
     Matrix<double, 3, Dynamic> MatCloudInfoOld;
     Matrix<int, 2, Dynamic> TI_map_old;
-    rolo_sam::CloudInfoStamp laserCloudInfoOld;
+    rolo::CloudInfoStamp laserCloudInfoOld;
     pcl::PointCloud<PointType>::Ptr FullCloudOld;
     pcl::PointCloud<PointType>::Ptr CloudCornerOld;
     pcl::PointCloud<PointType>::Ptr CloudSurfOld;
@@ -65,7 +65,7 @@ private:
     FLANNKDTree *fpfhTree;
 
     pcl::KdTreeFLANN<PointType>::Ptr kdtreeOldCloud;
-    std::queue<rolo_sam::CloudInfoStamp> laserCloudInfoBuf;
+    std::queue<rolo::CloudInfoStamp> laserCloudInfoBuf;
     Matrix<bool, 1, Dynamic> inliers1, inliers2;
     Matrix<double, 3, Dynamic> InliersLast, InliersOld;
     
@@ -79,14 +79,14 @@ public:
     isFirstFrame(true)
     {
         // 接受imu原始数据
-        subCloudInfo = nh.subscribe<rolo_sam::CloudInfoStamp>("rolo_sam/feature/cloud_info", 10, &LidarOdometry::cloudHandler, this, ros::TransportHints().tcpNoDelay());
+        subCloudInfo = nh.subscribe<rolo::CloudInfoStamp>("rolo/feature/cloud_info", 10, &LidarOdometry::cloudHandler, this, ros::TransportHints().tcpNoDelay());
         // mapOptimization传来的里程计数据
         // subOdometry = nh.subscribe<nav_msgs::Odometry>("lio_sam/mapping/odometry_incremental", 5,    &IMUPreintegration::odometryHandler, this, ros::TransportHints().tcpNoDelay());
         // 发布imu预测里程计
         pubLidarOdometry = nh.advertise<nav_msgs::Odometry> (odomTopic+"_incremental", 2000);
         pubLaserPath = nh.advertise<nav_msgs::Path> (odomTopic+"_incremental/path", 2000);
         pubRegScan = nh.advertise<sensor_msgs::PointCloud2> (odomTopic+"/registration_scan", 10);
-        pubPlotData = nh.advertise<std_msgs::Float64MultiArray> ("rolo_sam/data_test", 10);
+        pubPlotData = nh.advertise<std_msgs::Float64MultiArray> ("rolo/data_test", 10);
 
         Init();
     }
@@ -631,7 +631,7 @@ public:
     }
         
 
-    void cloudHandler(const rolo_sam::CloudInfoStampConstPtr &cloudIn){
+    void cloudHandler(const rolo::CloudInfoStampConstPtr &cloudIn){
         // 取时间戳,入buffer
         cloudTimeStamp = cloudIn->header.stamp;
         cloudTimeCur = cloudIn->header.stamp.toSec();
@@ -738,7 +738,7 @@ public:
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "rolo_sam");
+    ros::init(argc, argv, "rolo");
     
     LidarOdometry LO;
     

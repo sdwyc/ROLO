@@ -1,4 +1,4 @@
-#include "rolo_sam/undirected_graph.h"
+#include "rolo/undirected_graph.h"
 
 UndirectedGraph::UndirectedGraph():
     vertex_num(0), edge_num(0), max_find_time(100){}

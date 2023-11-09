@@ -2,7 +2,7 @@
 <package format="2">
   <name>rolo</name>
   <version>0.0.0</version>
-  <description>The rolo_sam package</description>
+  <description>The rolo package</description>
 
   <maintainer email="sdwyc@mail.sdu.edu.cn">wyc</maintainer>
 

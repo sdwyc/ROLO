@@ -3,6 +3,6 @@
     <arg name="project" default="rolo"/>
 
     <!--- Run Rviz-->
-    <node pkg="rviz" type="rviz" name="$(arg project)_rviz" args="-d $(find rolo_sam)/config/rviz/rolo_sam.rviz" />
+    <node pkg="rviz" type="rviz" name="$(arg project)_rviz" args="-d $(find rolo)/config/rviz/rolo.rviz" />
 
 </launch>

@@ -1,4 +1,4 @@
-rolo_sam:
+rolo:
 
   # Topics
   pointCloudTopic: "ouster/points"               # Point cloud data
