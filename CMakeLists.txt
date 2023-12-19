@@ -2,7 +2,12 @@ cmake_minimum_required(VERSION 3.0.2)
 project(rolo)
 
 set(CMAKE_BUILD_TYPE "Release")
+set(CMAKE_CXX_FLAGS "-O3 -Wall -g")
 set(CMAKE_CXX_STANDARD 14)
+
+if(DEFINED ENV{ROS_VERSION})
+  set(ROS_VERSION $ENV{ROS_VERSION})
+endif()
 
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
@@ -18,13 +23,16 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
 )
 
-find_package(teaserpp REQUIRED)
-find_package(OpenMP REQUIRED)
 find_package(PCL REQUIRED QUIET)
 find_package(OpenCV REQUIRED QUIET)
 find_package(GTSAM REQUIRED QUIET)
 find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS timer)
+find_package(OpenMP)
+if (OPENMP_FOUND)
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
 
 # pmc (Parallel Maximum Clique)
 
@@ -101,6 +109,24 @@ link_directories(
   ${OpenCV_LIBRARY_DIRS}
   ${GTSAM_LIBRARY_DIRS}
 )
+# Add icp lib
+add_library(rot_gicp SHARED
+  src/rot_gicp/gicp/lsq_registration.cpp
+  src/rot_gicp/gicp/rot_vgicp.cpp
+)
+target_link_libraries(rot_gicp
+  ${PCL_LIBRARIES}
+)
+if (OPENMP_FOUND)
+    if (TARGET OpenMP::OpenMP_CXX)
+        target_link_libraries(rot_gicp OpenMP::OpenMP_CXX)
+    endif ()
+endif ()
+target_include_directories(rot_gicp PUBLIC
+  include
+  ${PCL_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+)
 
 add_executable(${PROJECT_NAME}_imageProjection src/imageProjection.cpp)
 add_dependencies(${PROJECT_NAME}_imageProjection ${PROJECT_NAME}_generate_messages_cpp)
@@ -110,10 +136,10 @@ add_executable(${PROJECT_NAME}_featureExtraction src/featureExtraction.cpp)
 add_dependencies(${PROJECT_NAME}_featureExtraction ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(${PROJECT_NAME}_featureExtraction ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
 
-add_executable(${PROJECT_NAME}_lidarOdometry src/lidarOdometry.cpp src/undirected_graph.cpp)
-add_dependencies(${PROJECT_NAME}_lidarOdometry ${PROJECT_NAME}_generate_messages_cpp)
+add_executable(${PROJECT_NAME}_lidarOdometry src/lidarOdometry.cpp)
+add_dependencies(${PROJECT_NAME}_lidarOdometry ${PROJECT_NAME}_generate_messages_cpp rot_gicp)
 target_compile_options(${PROJECT_NAME}_lidarOdometry PRIVATE ${OpenMP_CXX_FLAGS})
-target_link_libraries(${PROJECT_NAME}_lidarOdometry ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam pmc teaserpp::teaser_registration teaserpp::teaser_io teaserpp::teaser_features)
+target_link_libraries(${PROJECT_NAME}_lidarOdometry ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam rot_gicp)
 
 add_executable(${PROJECT_NAME}_backMapping src/backMapping.cpp)
 add_dependencies(${PROJECT_NAME}_backMapping ${PROJECT_NAME}_generate_messages_cpp)
