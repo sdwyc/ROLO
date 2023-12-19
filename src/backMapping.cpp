@@ -926,7 +926,7 @@ public:
         //     if (std::abs(cloudInfo.imuPitchInit) < 1.4) // imu预积分得到的pitch角不能太大，否则认为数据无效
         //     {
         //         // 对IMU预积分和后端优化后的roll，pitch角进行加权融合
-        //         double imuWeight = imuRPYWeight;
+                // double imuWeight = imuRPYWeight;
         //         tf::Quaternion imuQuaternion;
         //         tf::Quaternion transformQuaternion;
         //         double rollMid, pitchMid, yawMid;
@@ -934,7 +934,7 @@ public:
         //         // slerp roll 横滚角插值
         //         transformQuaternion.setRPY(transformTobeMapped[0], 0, 0);
         //         imuQuaternion.setRPY(cloudInfo.imuRollInit, 0, 0);
-        //         tf::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
+                // tf::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
         //         transformTobeMapped[0] = rollMid;
 
         //         // slerp pitch  俯仰角插值

@@ -274,16 +274,16 @@ public:
 
                 for (int k = sp; k <= ep; k++)
                 {
-                    if (cloudLabel[k] < 0){
+                    if (cloudLabel[k] <= 0){
                         surfaceCloudScan->push_back(extractedCloud->points[k]);
                         // if(cloudLabel[k] == -2){
                         //     normalCloudScan->push_back(extractedCloud->points[k]);
                         // }
                     }
 
-                    if(cloudLabel[k] == 0){
-                        normalCloudScan->push_back(extractedCloud->points[k]);
-                    }
+                    // if(cloudLabel[k] == 0){
+                    //     normalCloudScan->push_back(extractedCloud->points[k]);
+                    // }
                 }
             }
             // 对筛选的平面点进行体素滤波，减少点的数量
