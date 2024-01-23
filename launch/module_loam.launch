@@ -1,4 +1,5 @@
 <launch>
+    <param name="use_sim_time" value="true" />
 
     <arg name="project" default="rolo"/>
     

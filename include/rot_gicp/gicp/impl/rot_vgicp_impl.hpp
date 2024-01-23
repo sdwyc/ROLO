@@ -416,7 +416,6 @@ bool RotVGICP<PointSource, PointTarget>::calculate_covariances(
   for (int i = 0; i < cloud->size(); i++) { // 为每个输入点云计算协方差
     std::vector<int> k_indices;
     std::vector<float> k_sq_distances;  // 利用kdtree 寻找最近的k_correspondences_个点
-    // std::cout << "1111111111111111" << std::endl;
     // std::cout << "size: " << cloud->size() << ", index: " << i << std::endl;
     // std::cout << "point: " << cloud->at(i).x << ", " << cloud->at(i).y << ", " << cloud->at(i).z << std::endl;
     kdtree.nearestKSearch(cloud->at(i), k_correspondences_, k_indices, k_sq_distances);
@@ -473,7 +472,6 @@ bool RotVGICP<PointSource, PointTarget>::calculate_covariances(
       covariances[i].setZero();
       covariances[i].template block<3, 3>(0, 0) = svd.matrixU() * values.asDiagonal() * svd.matrixV().transpose();
     }
-    // std::cout << "covariances: " << covariances[i] << std::endl;
   }
 
   return true;

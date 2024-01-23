@@ -62,9 +62,6 @@
 using namespace std;
 
 typedef pcl::PointXYZI PointType;
-typedef pcl::PointCloud<pcl::FPFHSignature33> FPFHFeature;
-typedef std::vector<Eigen::VectorXf> Feature;
-typedef flann::Index<flann::L2<float>> FLANNKDTree;
 
 enum class lidarType { VELODYNE, OUSTER };
 
@@ -78,21 +75,13 @@ public:
 
     //Topics
     string pointCloudTopic; // 输入的激光
-    string imuTopic;
     string odomTopic;
-    string gpsTopic;
 
     //Frames
     string lidarFrame;
     string baselinkFrame;
     string odometryFrame;
     string mapFrame;
-
-    // GPS Settings
-    bool useImuHeadingInitialization;
-    bool useGpsElevation;
-    float gpsCovThreshold;
-    float poseCovThreshold;
 
     // Save pcd
     bool savePCD;
@@ -102,46 +91,17 @@ public:
     lidarType sensor;
     int N_SCAN;
     int Horizon_SCAN;
-    int Ground_Scan_Ring;
     int downsampleRate;
     float lidarMinRange;
     float lidarMaxRange;
     float lidarNoiseBound;
-
-    // IMU
-    float imuAccNoise;
-    float imuGyrNoise;
-    float imuAccBiasN;
-    float imuGyrBiasN;
-    float imuGravity;
-    float imuRPYWeight;
-    vector<double> extRotV;
-    vector<double> extRPYV;
-    vector<double> extTransV;
-    Eigen::Matrix3d extRot;
-    Eigen::Matrix3d extRPY;
-    Eigen::Vector3d extTrans;
-    Eigen::Quaterniond extQRPY;
 
     // LOAM
     float edgeThreshold;
     float surfThreshold;
     int edgeFeatureMinValidNum;
     int surfFeatureMinValidNum;
-    float groundDegreeThre;
     float nearestSearchRadius;
-
-    // Rotation Optimization
-    float inlierDiffBound;
-    float costFactor;
-    float costDiffThre;
-    int maxOptIteration;
-    int minOptConstrains;
-    int maxOptContrains;
-
-    // Translation Optimization
-    vector<double> KScalar;
-    Eigen::Matrix3d KScalarMat;
 
     // voxel filter paprams
     float odometrySurfLeafSize;
@@ -180,19 +140,12 @@ public:
         nh.param<std::string>("/robot_id", robot_id, "roboat");
 
         nh.param<std::string>("rolo/pointCloudTopic", pointCloudTopic, "points_raw");
-        nh.param<std::string>("rolo/imuTopic", imuTopic, "imu_correct");
         nh.param<std::string>("rolo/odomTopic", odomTopic, "odometry/imu");
-        nh.param<std::string>("rolo/gpsTopic", gpsTopic, "odometry/gps");
 
         nh.param<std::string>("rolo/lidarFrame", lidarFrame, "base_link");
         nh.param<std::string>("rolo/baselinkFrame", baselinkFrame, "base_link");
         nh.param<std::string>("rolo/odometryFrame", odometryFrame, "odom");
         nh.param<std::string>("rolo/mapFrame", mapFrame, "map");
-
-        nh.param<bool>("rolo/useImuHeadingInitialization", useImuHeadingInitialization, false);
-        nh.param<bool>("rolo/useGpsElevation", useGpsElevation, false);
-        nh.param<float>("rolo/gpsCovThreshold", gpsCovThreshold, 2.0);
-        nh.param<float>("rolo/poseCovThreshold", poseCovThreshold, 25.0);
 
         nh.param<bool>("rolo/savePCD", savePCD, false);
         nh.param<std::string>("rolo/savePCDDirectory", savePCDDirectory, "/Downloads/LOAM/");
@@ -220,48 +173,16 @@ public:
 
         nh.param<int>("rolo/N_SCAN", N_SCAN, 16);
         nh.param<int>("rolo/Horizon_SCAN", Horizon_SCAN, 1800);
-        nh.param<int>("rolo/Ground_Scan_Ring", Ground_Scan_Ring, 7);
         nh.param<int>("rolo/downsampleRate", downsampleRate, 1);
         nh.param<float>("rolo/lidarMinRange", lidarMinRange, 1.0);
         nh.param<float>("rolo/lidarMaxRange", lidarMaxRange, 1000.0);
         nh.param<float>("rolo/lidarNoiseBound", lidarNoiseBound, 0.05);
 
-        nh.param<float>("rolo/imuAccNoise", imuAccNoise, 0.01);
-        nh.param<float>("rolo/imuGyrNoise", imuGyrNoise, 0.001);
-        nh.param<float>("rolo/imuAccBiasN", imuAccBiasN, 0.0002);
-        nh.param<float>("rolo/imuGyrBiasN", imuGyrBiasN, 0.00003);
-        nh.param<float>("rolo/imuGravity", imuGravity, 9.80511);
-        nh.param<float>("rolo/imuRPYWeight", imuRPYWeight, 0.01);
-        nh.param<vector<double>>("rolo/extrinsicRot", extRotV, vector<double>());
-        nh.param<vector<double>>("rolo/extrinsicRPY", extRPYV, vector<double>());
-        nh.param<vector<double>>("rolo/extrinsicTrans", extTransV, vector<double>());
-        extRot = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extRotV.data(), 3, 3);
-        extRPY = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extRPYV.data(), 3, 3);
-        extTrans = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extTransV.data(), 3, 1);
-        extQRPY = Eigen::Quaterniond(extRPY).inverse();
-
         nh.param<float>("rolo/edgeThreshold", edgeThreshold, 0.1);
         nh.param<float>("rolo/surfThreshold", surfThreshold, 0.1);
         nh.param<int>("rolo/edgeFeatureMinValidNum", edgeFeatureMinValidNum, 10);
         nh.param<int>("rolo/surfFeatureMinValidNum", surfFeatureMinValidNum, 100);
-        nh.param<float>("rolo/groundDegreeThre", groundDegreeThre, 10);
-        groundDegreeThre = groundDegreeThre * M_PI/180.0;   // rad form
         nh.param<float>("rolo/nearestSearchRadius", nearestSearchRadius, 1.0);
-
-        nh.param<float>("rolo/inlierDiffBound", inlierDiffBound, 0.1);
-        nh.param<float>("rolo/costFactor", costFactor, 1.2);
-        if (costFactor <= 1.0){
-            ROS_ERROR_STREAM(
-                "Invalid costFactor! costFactor must greater than 1");
-            ros::shutdown();
-        }
-        nh.param<float>("rolo/costDiffThre", costDiffThre, 0.001);
-        nh.param<int>("rolo/maxOptIteration", maxOptIteration, 100);
-        nh.param<int>("rolo/minOptConstrains", minOptConstrains, 50);
-        nh.param<int>("rolo/maxOptContrains", maxOptContrains, 100);
-
-        nh.param<vector<double>>("rolo/KScalar", KScalar, vector<double>());
-        KScalarMat = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(KScalar.data(), 3, 3);
 
         nh.param<float>("rolo/odometrySurfLeafSize", odometrySurfLeafSize, 0.2);
         nh.param<float>("rolo/mappingCornerLeafSize", mappingCornerLeafSize, 0.2);
