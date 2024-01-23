@@ -39,144 +39,144 @@ Eigen::Affine3f odom2affine(nav_msgs::Odometry odom) // Eigen::Affine3f为仿射
     return pcl::getTransformation(x, y, z, roll, pitch, yaw);
 }
 
-// class TransformFusion : public ParamLoader
-// {
-// public:
-//     std::mutex mtx;
+class TransformFusion : public ParamLoader
+{
+public:
+    std::mutex mtx;
 
-//     ros::Subscriber subImuOdometry;
-//     ros::Subscriber subLaserOdometry;
+    ros::Subscriber subImuOdometry;
+    ros::Subscriber subLaserOdometry;
 
-//     ros::Publisher pubLidarOdometry;
-//     ros::Publisher pubLidarPath;
+    ros::Publisher pubLidarOdometry;
+    ros::Publisher pubLidarPath;
 
-//     Eigen::Affine3f mappingOdomAffine;
-//     Eigen::Affine3f lidarOdomAffineFront;
-//     Eigen::Affine3f lidarOdomAffineBack;
+    Eigen::Affine3f mappingOdomAffine;
+    Eigen::Affine3f lidarOdomAffineFront;
+    Eigen::Affine3f lidarOdomAffineBack;
 
-//     tf::TransformListener tfListener;
-//     tf::StampedTransform lidar2Baselink;
+    tf::TransformListener tfListener;
+    tf::StampedTransform lidar2Baselink;
 
-//     double mappingOdomTime = -1;
-//     deque<nav_msgs::Odometry> lidarOdomQueue;
-//     //! 读取base-lidar的TF，声明输入输出
-//     TransformFusion()
-//     {
-//         if(lidarFrame != baselinkFrame)
-//         {
-//             try
-//             {
-//                 tfListener.waitForTransform(lidarFrame, baselinkFrame, ros::Time(0), ros::Duration(3.0));
-//                 tfListener.lookupTransform(lidarFrame, baselinkFrame, ros::Time(0), lidar2Baselink);
-//             }
-//             catch (tf::TransformException ex)
-//             {
-//                 ROS_ERROR("%s",ex.what());
-//             }
-//         }
-//         // 接受后端优化里程和预积分传过来的历程
-//         subLaserOdometry = nh.subscribe<nav_msgs::Odometry>("rolo/mapping/odometry", 5, &TransformFusion::mappingOdometryHandler, this, ros::TransportHints().tcpNoDelay());
-//         subImuOdometry   = nh.subscribe<nav_msgs::Odometry>(odomTopic+"_incremental",   2000, &TransformFusion::lidarOdometryHandler,   this, ros::TransportHints().tcpNoDelay());
-//         // 发布IMU里程计
-//         pubLidarOdometry   = nh.advertise<nav_msgs::Odometry>(odomTopic, 2000);
-//         pubLidarPath       = nh.advertise<nav_msgs::Path>("rolo/lidar_odometry/path", 1);
-//     }
-//     // //! 获取给定odom消息所代表的变换矩阵
-//     // Eigen::Affine3f odom2affine(nav_msgs::Odometry odom) // Eigen::Affine3f为仿射变换矩阵，旋转矩阵和平移矩阵的结合
-//     // {
-//     //     double x, y, z, roll, pitch, yaw;
-//     //     x = odom.pose.pose.position.x;
-//     //     y = odom.pose.pose.position.y;
-//     //     z = odom.pose.pose.position.z;
-//     //     tf::Quaternion orientation;
-//     //     tf::quaternionMsgToTF(odom.pose.pose.orientation, orientation);
-//     //     tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
-//     //     return pcl::getTransformation(x, y, z, roll, pitch, yaw);
-//     // }
-//     //! 存储lidar_odom消息的变换关系
-//     void mappingOdometryHandler(const nav_msgs::Odometry::ConstPtr& odomMsg)
-//     {
-//         std::lock_guard<std::mutex> lock(mtx);
+    double mappingOdomTime = -1;
+    deque<nav_msgs::Odometry> lidarOdomQueue;
+    //! 读取base-lidar的TF，声明输入输出
+    TransformFusion()
+    {
+        if(lidarFrame != baselinkFrame)
+        {
+            try
+            {
+                tfListener.waitForTransform(lidarFrame, baselinkFrame, ros::Time(0), ros::Duration(3.0));
+                tfListener.lookupTransform(lidarFrame, baselinkFrame, ros::Time(0), lidar2Baselink);
+            }
+            catch (tf::TransformException ex)
+            {
+                ROS_ERROR("%s",ex.what());
+            }
+        }
+        // 接受后端优化里程和预积分传过来的历程
+        subLaserOdometry = nh.subscribe<nav_msgs::Odometry>("rolo/mapping/odometry", 5, &TransformFusion::mappingOdometryHandler, this, ros::TransportHints().tcpNoDelay());
+        subImuOdometry   = nh.subscribe<nav_msgs::Odometry>(odomTopic+"_incremental",   2000, &TransformFusion::lidarOdometryHandler,   this, ros::TransportHints().tcpNoDelay());
+        // 发布IMU里程计
+        pubLidarOdometry   = nh.advertise<nav_msgs::Odometry>(odomTopic, 2000);
+        pubLidarPath       = nh.advertise<nav_msgs::Path>("rolo/lidar_odometry/path", 1);
+    }
+    // //! 获取给定odom消息所代表的变换矩阵
+    // Eigen::Affine3f odom2affine(nav_msgs::Odometry odom) // Eigen::Affine3f为仿射变换矩阵，旋转矩阵和平移矩阵的结合
+    // {
+    //     double x, y, z, roll, pitch, yaw;
+    //     x = odom.pose.pose.position.x;
+    //     y = odom.pose.pose.position.y;
+    //     z = odom.pose.pose.position.z;
+    //     tf::Quaternion orientation;
+    //     tf::quaternionMsgToTF(odom.pose.pose.orientation, orientation);
+    //     tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
+    //     return pcl::getTransformation(x, y, z, roll, pitch, yaw);
+    // }
+    //! 存储lidar_odom消息的变换关系
+    void mappingOdometryHandler(const nav_msgs::Odometry::ConstPtr& odomMsg)
+    {
+        std::lock_guard<std::mutex> lock(mtx);
 
-//         mappingOdomAffine = odom2affine(*odomMsg);
+        mappingOdomAffine = odom2affine(*odomMsg);
 
-//         mappingOdomTime = odomMsg->header.stamp.toSec();
-//     }
-//     //! imu预积分里程回调函数，根据后端优化后的激光里程消息，结合imu的位姿估计，得到当前时刻的位姿，并发布TF和odom消息，imu path
-//     void lidarOdometryHandler(const nav_msgs::Odometry::ConstPtr& odomMsg)
-//     {
-//         // static tf
-//         // 设置map和odom坐标系重合，发布静态TF
-//         static tf::TransformBroadcaster tfMap2Odom;
-//         static tf::Transform map_to_odom = tf::Transform(tf::createQuaternionFromRPY(0, 0, 0), tf::Vector3(0, 0, 0));
-//         tfMap2Odom.sendTransform(tf::StampedTransform(map_to_odom, odomMsg->header.stamp, mapFrame, odometryFrame));
+        mappingOdomTime = odomMsg->header.stamp.toSec();
+    }
+    //! imu预积分里程回调函数，根据后端优化后的激光里程消息，结合imu的位姿估计，得到当前时刻的位姿，并发布TF和odom消息，imu path
+    void lidarOdometryHandler(const nav_msgs::Odometry::ConstPtr& odomMsg)
+    {
+        // static tf
+        // 设置map和odom坐标系重合，发布静态TF
+        static tf::TransformBroadcaster tfMap2Odom;
+        static tf::Transform map_to_odom = tf::Transform(tf::createQuaternionFromRPY(0, 0, 0), tf::Vector3(0, 0, 0));
+        tfMap2Odom.sendTransform(tf::StampedTransform(map_to_odom, odomMsg->header.stamp, mapFrame, odometryFrame));
 
-//         std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::mutex> lock(mtx);
 
-//         lidarOdomQueue.push_back(*odomMsg);
+        lidarOdomQueue.push_back(*odomMsg);
 
-//         // get latest odometry (at current IMU stamp)
-//         if (mappingOdomTime == -1)
-//             return;
-//         while (!lidarOdomQueue.empty())
-//         {
-//             // IMU里程和激光里程进行时间标定
-//             if (lidarOdomQueue.front().header.stamp.toSec() <= mappingOdomTime)
-//                 lidarOdomQueue.pop_front();
-//             else
-//                 break;
-//         }
-//         Eigen::Affine3f lidarOdomAffineFront = odom2affine(lidarOdomQueue.front());
-//         Eigen::Affine3f lidarOdomAffineBack = odom2affine(lidarOdomQueue.back());
-//         // 求前后两帧lidar里程计位姿的变换关系
-//         Eigen::Affine3f lidarOdomAffineIncre = lidarOdomAffineFront.inverse() * lidarOdomAffineBack;
-//         // 对最新的激光里程位姿进行相应变换，结合imu积分推断得到当前帧的激光里程估计
-//         Eigen::Affine3f imuOdomAffineLast = mappingOdomAffine * lidarOdomAffineIncre;
-//         float x, y, z, roll, pitch, yaw;
-//         pcl::getTranslationAndEulerAngles(imuOdomAffineLast, x, y, z, roll, pitch, yaw);
+        // get latest odometry (at current IMU stamp)
+        if (mappingOdomTime == -1)
+            return;
+        while (!lidarOdomQueue.empty())
+        {
+            // IMU里程和激光里程进行时间标定
+            if (lidarOdomQueue.front().header.stamp.toSec() <= mappingOdomTime)
+                lidarOdomQueue.pop_front();
+            else
+                break;
+        }
+        Eigen::Affine3f lidarOdomAffineFront = odom2affine(lidarOdomQueue.front());
+        Eigen::Affine3f lidarOdomAffineBack = odom2affine(lidarOdomQueue.back());
+        // 求前后两帧lidar里程计位姿的变换关系
+        Eigen::Affine3f lidarOdomAffineIncre = lidarOdomAffineFront.inverse() * lidarOdomAffineBack;
+        // 对最新的激光里程位姿进行相应变换，结合imu积分推断得到当前帧的激光里程估计
+        Eigen::Affine3f imuOdomAffineLast = mappingOdomAffine * lidarOdomAffineIncre;
+        float x, y, z, roll, pitch, yaw;
+        pcl::getTranslationAndEulerAngles(imuOdomAffineLast, x, y, z, roll, pitch, yaw);
         
-//         // publish latest odometry
-//         nav_msgs::Odometry laserOdometry = lidarOdomQueue.back();
-//         laserOdometry.pose.pose.position.x = x;
-//         laserOdometry.pose.pose.position.y = y;
-//         laserOdometry.pose.pose.position.z = z;
-//         laserOdometry.pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
-//         pubLidarOdometry.publish(laserOdometry);
+        // publish latest odometry
+        nav_msgs::Odometry laserOdometry = lidarOdomQueue.back();
+        laserOdometry.pose.pose.position.x = x;
+        laserOdometry.pose.pose.position.y = y;
+        laserOdometry.pose.pose.position.z = z;
+        laserOdometry.pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
+        pubLidarOdometry.publish(laserOdometry);
 
-//         // publish tf
-//         // 发布odom->base_link的TF
-//         static tf::TransformBroadcaster tfOdom2BaseLink;
-//         tf::Transform tCur;
-//         tf::poseMsgToTF(laserOdometry.pose.pose, tCur);
-//         if(lidarFrame != baselinkFrame)
-//             tCur = tCur * lidar2Baselink;
-//         tf::StampedTransform odom_2_baselink = tf::StampedTransform(tCur, odomMsg->header.stamp, odometryFrame, baselinkFrame);
-//         tfOdom2BaseLink.sendTransform(odom_2_baselink);
+        // publish tf
+        // 发布odom->base_link的TF
+        static tf::TransformBroadcaster tfOdom2BaseLink;
+        tf::Transform tCur;
+        tf::poseMsgToTF(laserOdometry.pose.pose, tCur);
+        if(lidarFrame != baselinkFrame)
+            tCur = tCur * lidar2Baselink;
+        tf::StampedTransform odom_2_baselink = tf::StampedTransform(tCur, odomMsg->header.stamp, odometryFrame, baselinkFrame);
+        tfOdom2BaseLink.sendTransform(odom_2_baselink);
 
-//         // publish Lidar odometry path
-//         static nav_msgs::Path lidarPath;
-//         static double last_path_time = -1;
-//         double lidarTime = lidarOdomQueue.back().header.stamp.toSec();
-//         if (lidarTime - last_path_time > 0.05)
-//         {
-//             last_path_time = lidarTime;
-//             geometry_msgs::PoseStamped pose_stamped;
-//             pose_stamped.header.stamp = lidarOdomQueue.back().header.stamp;
-//             pose_stamped.header.frame_id = odometryFrame;
-//             pose_stamped.pose = laserOdometry.pose.pose;
-//             lidarPath.poses.push_back(pose_stamped);
-//             // 只保留1s的imu里程计轨迹
-//             while(!lidarPath.poses.empty() && lidarPath.poses.front().header.stamp.toSec() < mappingOdomTime - 1.0)
-//                 lidarPath.poses.erase(lidarPath.poses.begin());
-//             if (pubLidarPath.getNumSubscribers() != 0)
-//             {
-//                 lidarPath.header.stamp = lidarOdomQueue.back().header.stamp;
-//                 lidarPath.header.frame_id = odometryFrame;
-//                 pubLidarPath.publish(lidarPath);
-//             }
-//         }
-//     }
-// };
+        // publish Lidar odometry path
+        static nav_msgs::Path lidarPath;
+        static double last_path_time = -1;
+        double lidarTime = lidarOdomQueue.back().header.stamp.toSec();
+        if (lidarTime - last_path_time > 0.05)
+        {
+            last_path_time = lidarTime;
+            geometry_msgs::PoseStamped pose_stamped;
+            pose_stamped.header.stamp = lidarOdomQueue.back().header.stamp;
+            pose_stamped.header.frame_id = odometryFrame;
+            pose_stamped.pose = laserOdometry.pose.pose;
+            lidarPath.poses.push_back(pose_stamped);
+            // 只保留1s的imu里程计轨迹
+            while(!lidarPath.poses.empty() && lidarPath.poses.front().header.stamp.toSec() < mappingOdomTime - 1.0)
+                lidarPath.poses.erase(lidarPath.poses.begin());
+            if (pubLidarPath.getNumSubscribers() != 0)
+            {
+                lidarPath.header.stamp = lidarOdomQueue.back().header.stamp;
+                lidarPath.header.frame_id = odometryFrame;
+                pubLidarPath.publish(lidarPath);
+            }
+        }
+    }
+};
 
 class LidarOdometry : public ParamLoader
 {
@@ -236,6 +236,7 @@ private:
     
     Matrix3d Rotation;
     Vector3d Translation;
+    Vector3d TranslationOld;
     float LaserOdomPose[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // [x, y, z, roll, pitch, yaw]
 
 
@@ -265,11 +266,13 @@ public:
     void Init(){
         Rotation = Matrix3d::Identity();
         Translation = Vector3d::Zero();
+        TranslationOld = Vector3d::Zero();
         lidarMappingAffine = Affine3f::Identity();
         lastOdomAffine = Affine3f::Identity();
         transformation_interpolated = Affine3f::Identity();
         lastOdomTime = -1;
         RegCloud.reset(new pcl::PointCloud<PointType>());
+        lastMappingInterval = 9999.0;
         // 当前帧数据
         FullCloudLast.reset(new pcl::PointCloud<PointType>());
         CloudCornerLast.reset(new pcl::PointCloud<PointType>());
@@ -294,26 +297,26 @@ public:
         // std::lock_guard<std::mutex> lock(mtx);
         // 当前时刻odom时间
         double currentCorrectionTime = mappedOdom->header.stamp.toSec();
-        lastMappingInterval = currentCorrectionTime - lastOdomTime;
+        // lastMappingInterval = currentCorrectionTime - lastOdomTime;
         nav_msgs::Odometry mappedOdom_ = *mappedOdom;
-        Affine3f currOdomAffine = odom2affine(mappedOdom_);
-        lidarMappingAffine = lastOdomAffine.inverse() * currOdomAffine;
-        lastOdomAffine = currOdomAffine;
-        std::cout << "lidarMappingAffine callback: \n "<< lidarMappingAffine.matrix() << std::endl;
+        // Affine3f currOdomAffine = odom2affine(mappedOdom_);
+        // lidarMappingAffine = lastOdomAffine.inverse() * currOdomAffine;
+        // lastOdomAffine = currOdomAffine;
+        // std::cout << "lidarMappingAffine callback: \n "<< lidarMappingAffine.matrix() << std::endl;
         // 时间标定
         if(currentCorrectionTime - cloudTimeCur < 0.2){
             // 将后端位姿传给前端
             // mtx.lock();
-            LaserOdomPose[0] = mappedOdom_.pose.pose.position.x;
-            LaserOdomPose[1] = mappedOdom_.pose.pose.position.y;
-            LaserOdomPose[2] = mappedOdom_.pose.pose.position.z;
-            double roll, pitch, yaw;
-            tf::Quaternion quat;
-            tf::quaternionMsgToTF(mappedOdom_.pose.pose.orientation, quat);
-            tf::Matrix3x3(quat).getRPY(roll, pitch, yaw);
-            LaserOdomPose[3] = roll;
-            LaserOdomPose[4] = pitch;
-            LaserOdomPose[5] = yaw;
+            // LaserOdomPose[0] = mappedOdom_.pose.pose.position.x;
+            // LaserOdomPose[1] = mappedOdom_.pose.pose.position.y;
+            // LaserOdomPose[2] = mappedOdom_.pose.pose.position.z;
+            // double roll, pitch, yaw;
+            // tf::Quaternion quat;
+            // tf::quaternionMsgToTF(mappedOdom_.pose.pose.orientation, quat);
+            // tf::Matrix3x3(quat).getRPY(roll, pitch, yaw);
+            // LaserOdomPose[3] = roll;
+            // LaserOdomPose[4] = pitch;
+            // LaserOdomPose[5] = yaw;
             // mtx.unlock();
         }
         lastOdomTime = currentCorrectionTime;
@@ -325,10 +328,12 @@ public:
         // std::chrono::duration<double> elapsed_seconds = end - start;
         // printf("Solver Duration: %f ms.\n" ,elapsed_seconds.count() * 1000);
 
-        // std::cout << "--- rot_vgicp_st ---" << std::endl;
         pcl::PointCloud<PointType>::Ptr feature_propagated(new pcl::PointCloud<PointType>);
+        pcl::PointCloud<PointType>::Ptr feature_rotated(new pcl::PointCloud<PointType>);
         pcl::PointCloud<PointType>::Ptr aligned(new pcl::PointCloud<PointType>);
         feature_propagated->clear();
+        feature_rotated->clear();
+        // 先平移插值，使中心对齐
         pcl::transformPointCloud(*featureOld, *feature_propagated, transformation_interpolated);
         fast_gicp::RotVGICP<PointType, PointType> rot_vgicp;
         rot_vgicp.setResolution(1.0);
@@ -355,6 +360,14 @@ public:
                                                     rotation_euler[2]); 
         std::cout << "rotation angles: " << std::endl << rotation_euler*180/M_PI << std::endl;
 
+        //* 平移配准
+        // 首先进行旋转
+        aligned->clear();
+        pcl::transformPointCloud(*featureOld, *feature_rotated, transformation_interpolated);
+        Eigen::Vector3d Reg_translation = Eigen::Vector3d::Zero();
+        rot_vgicp.computeTranslation(*aligned, Reg_translation, Translation, TranslationOld, 0.1, 0.1);
+        std::cout << "Reg_translation: " << Reg_translation.transpose() << std::endl;
+        Translation += Reg_translation;
     }
 
     void cloudHandler(const rolo::CloudInfoStampConstPtr &cloudIn){
@@ -409,16 +422,16 @@ public:
         // 状态前向插值
         // std::cout << "lastOdomTime: " << lastOdomTime << std::endl;
         // std::cout << "doneBackOpt: " << doneBackOpt << std::endl;
-        if(lastOdomTime != -1.0){   // 为初始化则不进行插值
+        if(lastOdomTime != -1.0){   // 未初始化则不进行插值
             // double latestInterval = doneBackOpt? cloudTimeCur - lastOdomTime : cloudTimeCur - cloudTimeLast;
             double latestInterval = cloudTimeCur - cloudTimeLast;
             
-            std::cout << "lastMappingInterval: " << lastMappingInterval << std::endl;
-            // std::cout << "latestInterval: " << latestInterval << std::endl;
+            // std::cout << "lastMappingInterval: " << lastMappingInterval << std::endl;
             // Affine3f transformation_interpolated = Affine3f::Identity();
             // std::cout << "latestInterval: " << latestInterval << std::endl;
             // std::cout << "lidarMappingAffine: \n" << lidarMappingAffine.matrix() << std::endl;
             stateLinearPropagation(lidarMappingAffine, lastMappingInterval, latestInterval, transformation_interpolated);
+            // transformation_interpolated = Affine3f::Identity();
             // std::cout << "transformation_interpolated: \n" << transformation_interpolated.matrix() << std::endl;
             Rotation = transformation_interpolated.rotation().cast<double>();
             Translation = transformation_interpolated.translation().cast<double>();
@@ -427,6 +440,7 @@ public:
             }
             doneBackOpt = false;
             cloudTimeLast = cloudTimeCur; // 仅对相邻两帧之间进行插值
+            lastMappingInterval = latestInterval;
         }
 
         scanRegeistration();
@@ -436,7 +450,7 @@ public:
         if(!failureFrameFlag){
             // 发布ROS消息和TF
             pubMessage();
-            // pubTranform();
+            pubTranform();
         }
         else{
             printf(" Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n "); 
@@ -465,7 +479,8 @@ public:
         // Affine3d transform_affine_double = transform_affine.cast<double>;
         Affine3f transformStep;
         transformStep.matrix() = trans.cast<float>();
-        Affine3f transformed_pose = transform_affine * transformStep; // 仿射变换遵循右乘原则
+        Affine3f transformed_pose = transform_affine * transformStep.inverse(); // 仿射变换遵循右乘原则
+        lidarMappingAffine = transformStep;
         // printf("2222222222222222222222\n");
         
         auto end_time = std::chrono::system_clock::now();
@@ -503,6 +518,7 @@ public:
         // *CloudGroundOld = *CloudGroundLast;
         *featureOld = *featureLast;
         // *ground_and_cornerOld = *ground_and_cornerLast;
+        TranslationOld = Translation;
     }
 
     //! 检测前端里程计估计是否发生跳变，如果发生跳变，忽略当前帧的估计结果
@@ -522,15 +538,15 @@ public:
         return true;
     }
     
-    // void pubTranform(){
-    //     // 发布TF
-    //     // Publish TF
-    //     static tf::TransformBroadcaster br;
-    //     tf::Transform t_odom_to_lidar = tf::Transform(tf::createQuaternionFromRPY(LaserOdomPose[3], LaserOdomPose[4], LaserOdomPose[5]),
-    //                                                   tf::Vector3(LaserOdomPose[0], LaserOdomPose[1], LaserOdomPose[2]));
-    //     tf::StampedTransform trans_odom_to_lidar = tf::StampedTransform(t_odom_to_lidar, cloudTimeStamp, odometryFrame, baselinkFrame);
-    //     br.sendTransform(trans_odom_to_lidar);
-    // }
+    void pubTranform(){
+        // 发布TF
+        // Publish TF
+        static tf::TransformBroadcaster br;
+        tf::Transform t_odom_to_lidar = tf::Transform(tf::createQuaternionFromRPY(LaserOdomPose[3], LaserOdomPose[4], LaserOdomPose[5]),
+                                                      tf::Vector3(LaserOdomPose[0], LaserOdomPose[1], LaserOdomPose[2]));
+        tf::StampedTransform trans_odom_to_lidar = tf::StampedTransform(t_odom_to_lidar, cloudTimeStamp, odometryFrame, "lidar");
+        br.sendTransform(trans_odom_to_lidar);
+    }
 
     void pubMessage(){
         publishCloud(pubRegScan, RegCloud, cloudTimeStamp, baselinkFrame);
@@ -597,7 +613,7 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "rolo");
     
     LidarOdometry LO;
-    // TransformFusion TF;
+    TransformFusion TF;
     
     ROS_INFO("\033[1;32m----> Laser Odometry Started.\033[0m");
 

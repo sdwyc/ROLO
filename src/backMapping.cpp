@@ -996,8 +996,8 @@ public:
         // addGPSFactor();
 
         // loop factor
-        // // 添加回环因子
-        // addLoopFactor();
+        // 添加回环因子
+        addLoopFactor();
 
         // cout << "****************************************************" << endl;
         // gtSAMgraph.print("GTSAM Graph:\n");
@@ -1096,6 +1096,27 @@ public:
             // 将当前位姿存入Value
             initialEstimate.insert(cloudKeyPoses3D->size(), poseTo);
         }
+    }
+
+    void addLoopFactor()
+    {
+        if (loopIndexQueue.empty()) // 如果没有匹配的回环帧，则不添加因子
+            return;
+
+        for (int i = 0; i < (int)loopIndexQueue.size(); ++i) // 遍历所有回环对
+        {
+            int indexFrom = loopIndexQueue[i].first; // 取历史帧
+            int indexTo = loopIndexQueue[i].second;  // 取当前帧
+            gtsam::Pose3 poseBetween = loopPoseQueue[i];  // 取位姿变换矩阵
+            gtsam::noiseModel::Diagonal::shared_ptr noiseBetween = loopNoiseQueue[i];
+            // 添加回环因子
+            gtSAMgraph.add(BetweenFactor<Pose3>(indexFrom, indexTo, poseBetween, noiseBetween));
+        }
+
+        loopIndexQueue.clear();
+        loopPoseQueue.clear();
+        loopNoiseQueue.clear();
+        aLoopIsClosed = true;   // 回环因子添加标志位
     }
 
     //! 若发生回环，则更新历史所有关键帧状态位姿列表，若为回环，则无操作
@@ -1626,7 +1647,26 @@ public:
         pubLoopConstraintEdge.publish(markerArray);
     }
 
-
+    void saveTUM(){
+        ofstream tum_file;
+        tum_file.open("/home/sdu/catkin_ws/src/ROLO/data/tum/temp.tum");
+        tum_file.clear();
+        for (int i=0 ; i<cloudKeyPoses6D->size(); i++){
+            geometry_msgs::Quaternion q = tf::createQuaternionMsgFromRollPitchYaw(cloudKeyPoses6D->points[i].roll, 
+                                                                                  cloudKeyPoses6D->points[i].pitch, 
+                                                                                  cloudKeyPoses6D->points[i].yaw);
+            tum_file << setprecision(19) << cloudKeyPoses6D->points[i].time << " "
+                     << cloudKeyPoses6D->points[i].x << " "
+                     << cloudKeyPoses6D->points[i].y << " "
+                     << cloudKeyPoses6D->points[i].z << " "
+                     << q.x << " "
+                     << q.y << " "
+                     << q.z << " "
+                     << q.w << std::endl;
+        }
+        tum_file.close();
+        printf("Saved .tum file!\n");
+    }
 };
 
 int main(int argc, char** argv)
@@ -1644,6 +1684,6 @@ int main(int argc, char** argv)
 
     loopthread.join();
     visualizeMapThread.join();
-
+    BM.saveTUM();
     return 0;
 }

@@ -98,7 +98,9 @@ public:
     return target_covs_;
   }
 
-
+  virtual void computeTranslation(PointCloudSource& output, Eigen::Vector3d& trans,
+                          const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
+                          const double interval_tn, const double interval_tn_1);
 
 protected:
   virtual void computeTransformation(PointCloudSource& output, const Matrix4& guess) override;
@@ -106,6 +108,11 @@ protected:
   virtual double linearize(const Eigen::Isometry3d& trans, Eigen::Matrix<double, 6, 6>* H = nullptr, Eigen::Matrix<double, 6, 1>* b = nullptr) override;
   virtual double so3_linearize(const Eigen::Isometry3d& trans, Eigen::Matrix<double, 3, 3>* H = nullptr, Eigen::Matrix<double, 3, 1>* b = nullptr) override;
   virtual double compute_error(const Eigen::Isometry3d& trans) override;
+  virtual double t3_linearize(const Eigen::Vector3d& trans, const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
+                              const double interval_tn, const double interval_tn_1,
+                              Eigen::Matrix<double, 6, 6>* H, Eigen::Matrix<double, 6, 1>* b) override;
+  virtual double compute_t_error(const Eigen::Vector3d& trans, const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
+                                 const double& interval_tn, const double& interval_tn_1) override;
   
   template <typename PointT>
   bool calculate_covariances(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, pcl::search::Search<PointT>& kdtree, std::vector<Eigen::Matrix4d, Eigen::aligned_allocator<Eigen::Matrix4d>>& covariances);
