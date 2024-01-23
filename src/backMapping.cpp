@@ -5,7 +5,6 @@
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/slam/PriorFactor.h>
 #include <gtsam/slam/BetweenFactor.h>
-#include <gtsam/navigation/GPSFactor.h>
 #include <gtsam/navigation/ImuFactor.h>
 #include <gtsam/navigation/CombinedImuFactor.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
@@ -15,6 +14,7 @@
 #include <gtsam/inference/Symbol.h>
 
 #include <gtsam/nonlinear/ISAM2.h>
+#include <ros/package.h>
 
 using namespace gtsam;
 
@@ -25,8 +25,8 @@ using symbol_shorthand::G; // GPS pose
 
 
 /*
-    * A point cloud type that has 6D pose info ([x,y,z,roll,pitch,yaw] intensity is time stamp)
-    */
+* A point cloud type that has 6D pose info ([x,y,z,roll,pitch,yaw] intensity is time stamp)
+*/
 struct PointXYZIRPYT
 {
     PCL_ADD_POINT4D
@@ -165,8 +165,7 @@ public:
         pubPath                     = nh.advertise<nav_msgs::Path>("rolo/mapping/path", 1);  // 全局路径
         // Feature extration传过来的cloud_info
         subCloud = nh.subscribe<rolo::CloudInfoStamp>(odomTopic+"/cloud_info", 1, &backMapping::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
-        // GPS数据
-        // subGPS   = nh.subscribe<nav_msgs::Odometry> (gpsTopic, 200, &backMapping::gpsHandler, this, ros::TransportHints().tcpNoDelay());
+
         // 回环数据
         // subLoop  = nh.subscribe<std_msgs::Float64MultiArray>("lio_loop/loop_closure_detection", 1, &backMapping::loopInfoHandler, this, ros::TransportHints().tcpNoDelay());
 
@@ -362,58 +361,35 @@ public:
         // 初始化过程
         if (cloudKeyPoses3D->points.empty())
         {
-            // 来自前端IMU数据的估计姿态
+            // 来自前端Odometry数据的估计姿态
             transformTobeMapped[0] = 0.0;
             transformTobeMapped[1] = 0.0;
             transformTobeMapped[2] = 0.0;
-
-            if (!useImuHeadingInitialization)   // 如果使用GPS数据，则优先使用GPS的yaw
-                transformTobeMapped[2] = 0;
-            // 存储初始的IMU数据，即0，0，0坐标点，RPY姿态
-            // lastOdomTransformation = pcl::getTransformation(0, 0, 0, 0, 0, 0); // save imu before return;
             return;
         }
 
-        // use imu pre-integration estimation for pose guess
-        static bool lastImuPreTransAvailable = false; // 直接使用IMU预估计的标志位
-        static Eigen::Affine3f lastImuPreTransformation; // 上一时刻的IMU预积分里程计
+        // use LiDAR odometry estimation for pose guess
+        static bool lastOdomTransAvailable = false; // 直接使用IMU预估计的标志位
+        static Eigen::Affine3f lastOdomTransformation; // 上一时刻的IMU预积分里程计
         if (cloudInfo.odomAvailable == true)    // 如果IMU预积分得到了初始里程计估计
         {   // 将IMU预积分里程计转为eigen矩阵格式
             Eigen::Affine3f transBack = pcl::getTransformation(cloudInfo.initialGuessX,    cloudInfo.initialGuessY,     cloudInfo.initialGuessZ, 
                                                                cloudInfo.initialGuessRoll, cloudInfo.initialGuessPitch, cloudInfo.initialGuessYaw);
-            if (lastImuPreTransAvailable == false)
+            if (lastOdomTransAvailable == false)
             {
-                lastImuPreTransformation = transBack;
-                lastImuPreTransAvailable = true;
+                lastOdomTransformation = transBack;
+                lastOdomTransAvailable = true;
             } else { // 如果不直接用imu预积分的里程计，则根据imu里程计的逆变换得到变换矩阵，再对上一帧进行变换,得到当前的位姿估计
-                Eigen::Affine3f transIncre = lastImuPreTransformation.inverse() * transBack; // 求出相邻两帧的变换关系
+                Eigen::Affine3f transIncre = lastOdomTransformation.inverse() * transBack; // 求出相邻两帧的变换关系
                 Eigen::Affine3f transTobe = trans2Affine3f(transformTobeMapped);
                 Eigen::Affine3f transFinal = transTobe * transIncre;
                 pcl::getTranslationAndEulerAngles(transFinal, transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5], 
                                                               transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]);
 
-                lastImuPreTransformation = transBack;
-
-                // lastOdomTransformation = pcl::getTransformation(0, 0, 0, cloudInfo.imuRollInit, cloudInfo.imuPitchInit, cloudInfo.imuYawInit); // save imu before return;
+                lastOdomTransformation = transBack;
                 return;
             }
         }
-
-        // // use imu incremental estimation for pose guess (only rotation)
-        // // 使用IMU的数据更新初始位姿
-        // if (cloudInfo.imuAvailable == true)
-        // {
-        //     Eigen::Affine3f transBack = pcl::getTransformation(0, 0, 0, cloudInfo.imuRollInit, cloudInfo.imuPitchInit, cloudInfo.imuYawInit);
-            // Eigen::Affine3f transIncre = lastOdomTransformation.inverse() * transBack;
-
-        //     Eigen::Affine3f transTobe = trans2Affine3f(transformTobeMapped);
-        //     Eigen::Affine3f transFinal = transTobe * transIncre;
-        //     pcl::getTranslationAndEulerAngles(transFinal, transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5], 
-        //                                                   transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]);
-
-            // lastOdomTransformation = pcl::getTransformation(0, 0, 0, cloudInfo.imuRollInit, cloudInfo.imuPitchInit, cloudInfo.imuYawInit); // save imu before return;
-        //     return;
-        // }
     }
 
     //! 提取周围的关键帧，同时提取其角点和平面点
@@ -921,29 +897,6 @@ public:
     //! 对后端优化位姿与imu预积分推断位姿的roll，pitch和z值进行加权融合，并限幅
     void transformUpdate()
     {
-        // if (cloudInfo.imuAvailable == true)
-        // {
-        //     if (std::abs(cloudInfo.imuPitchInit) < 1.4) // imu预积分得到的pitch角不能太大，否则认为数据无效
-        //     {
-        //         // 对IMU预积分和后端优化后的roll，pitch角进行加权融合
-                // double imuWeight = imuRPYWeight;
-        //         tf::Quaternion imuQuaternion;
-        //         tf::Quaternion transformQuaternion;
-        //         double rollMid, pitchMid, yawMid;
-
-        //         // slerp roll 横滚角插值
-        //         transformQuaternion.setRPY(transformTobeMapped[0], 0, 0);
-        //         imuQuaternion.setRPY(cloudInfo.imuRollInit, 0, 0);
-                // tf::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
-        //         transformTobeMapped[0] = rollMid;
-
-        //         // slerp pitch  俯仰角插值
-        //         transformQuaternion.setRPY(0, transformTobeMapped[1], 0);
-        //         imuQuaternion.setRPY(0, cloudInfo.imuPitchInit, 0);
-        //         tf::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
-        //         transformTobeMapped[1] = pitchMid;
-        //     }
-        // }
         // 对roll，pitch角和z坐标进行限幅
         transformTobeMapped[0] = constraintTransformation(transformTobeMapped[0], rotation_tollerance);
         transformTobeMapped[1] = constraintTransformation(transformTobeMapped[1], rotation_tollerance);
@@ -957,12 +910,6 @@ public:
     {
         if (cloudKeyPoses3D->points.empty()) // 无关键帧则跳过
             return true;
-
-        // if (sensor == SensorType::LIVOX)
-        // {
-        //     if (timeLaserInfoCur - cloudKeyPoses6D->back().time > 1.0)
-        //         return true;
-        // }
 
         Eigen::Affine3f transStart = pclPointToAffine3f(cloudKeyPoses6D->back());   // 上一个关键帧的位姿
         // 当前帧的优化位姿
@@ -991,9 +938,6 @@ public:
         // odom factor
         // 如果是初始则添加第一个先验因子，否则，添加k-1到k帧的里程计因子
         addOdomFactor();
-
-        // // gps factor
-        // addGPSFactor();
 
         // loop factor
         // 添加回环因子
@@ -1649,7 +1593,8 @@ public:
 
     void saveTUM(){
         ofstream tum_file;
-        tum_file.open("/home/sdu/catkin_ws/src/ROLO/data/tum/temp.tum");
+        string pkg_path = ros::package::getPath("rolo");
+        tum_file.open(pkg_path + "/data/rolo_temp.tum");
         tum_file.clear();
         for (int i=0 ; i<cloudKeyPoses6D->size(); i++){
             geometry_msgs::Quaternion q = tf::createQuaternionMsgFromRollPitchYaw(cloudKeyPoses6D->points[i].roll, 

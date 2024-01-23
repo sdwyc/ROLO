@@ -120,20 +120,47 @@ public:
             return;
         while (!lidarOdomQueue.empty())
         {
-            // IMU里程和激光里程进行时间标定
+            // 前端里程和后端里程进行时间标定
             if (lidarOdomQueue.front().header.stamp.toSec() <= mappingOdomTime)
                 lidarOdomQueue.pop_front();
             else
                 break;
         }
+
         Eigen::Affine3f lidarOdomAffineFront = odom2affine(lidarOdomQueue.front());
         Eigen::Affine3f lidarOdomAffineBack = odom2affine(lidarOdomQueue.back());
         // 求前后两帧lidar里程计位姿的变换关系
         Eigen::Affine3f lidarOdomAffineIncre = lidarOdomAffineFront.inverse() * lidarOdomAffineBack;
-        // 对最新的激光里程位姿进行相应变换，结合imu积分推断得到当前帧的激光里程估计
-        Eigen::Affine3f imuOdomAffineLast = mappingOdomAffine * lidarOdomAffineIncre;
+        Eigen::Matrix<float, 6, 1> lidar_pose_front;
+        Eigen::Matrix<float, 6, 1> lidar_pose_back;
+        Eigen::Matrix<float, 6, 1> lidar_pose_incre;
+        // pcl::getTranslationAndEulerAngles(lidarOdomAffineFront, lidar_pose_front(0),
+        //                                                         lidar_pose_front(1),
+        //                                                         lidar_pose_front(2),
+        //                                                         lidar_pose_front(3),
+        //                                                         lidar_pose_front(4),
+        //                                                         lidar_pose_front(5));
+        // pcl::getTranslationAndEulerAngles(lidarOdomAffineBack, lidar_pose_back(0),
+        //                                                         lidar_pose_back(1),
+        //                                                         lidar_pose_back(2),
+        //                                                         lidar_pose_back(3),
+        //                                                         lidar_pose_back(4),
+        //                                                         lidar_pose_back(5));
+        // pcl::getTranslationAndEulerAngles(lidarOdomAffineIncre, lidar_pose_incre(0),
+        //                                                         lidar_pose_incre(1),
+        //                                                         lidar_pose_incre(2),
+        //                                                         lidar_pose_incre(3),
+        //                                                         lidar_pose_incre(4),
+        //                                                         lidar_pose_incre(5));
+
+        // std::cout << "lidar_pose_front: " << lidar_pose_front.transpose() << std::endl;
+        // std::cout << "lidar_pose_back: " << lidar_pose_back.transpose() << std::endl;
+        // std::cout << "lidar_pose_incre: " << lidar_pose_incre.transpose() << std::endl;
+        
+        // 对最新的激光里程位姿进行相应变换，得到当前帧的激光里程估计
+        Eigen::Affine3f lidarOdomAffineLast = mappingOdomAffine * lidarOdomAffineIncre;
         float x, y, z, roll, pitch, yaw;
-        pcl::getTranslationAndEulerAngles(imuOdomAffineLast, x, y, z, roll, pitch, yaw);
+        pcl::getTranslationAndEulerAngles(lidarOdomAffineLast, x, y, z, roll, pitch, yaw);
         
         // publish latest odometry
         nav_msgs::Odometry laserOdometry = lidarOdomQueue.back();
@@ -294,31 +321,9 @@ public:
 
     //! 接受后端的里程计消息，并与前端里程计融合
     void odometryHandler(const nav_msgs::OdometryConstPtr &mappedOdom){
-        // std::lock_guard<std::mutex> lock(mtx);
         // 当前时刻odom时间
         double currentCorrectionTime = mappedOdom->header.stamp.toSec();
-        // lastMappingInterval = currentCorrectionTime - lastOdomTime;
         nav_msgs::Odometry mappedOdom_ = *mappedOdom;
-        // Affine3f currOdomAffine = odom2affine(mappedOdom_);
-        // lidarMappingAffine = lastOdomAffine.inverse() * currOdomAffine;
-        // lastOdomAffine = currOdomAffine;
-        // std::cout << "lidarMappingAffine callback: \n "<< lidarMappingAffine.matrix() << std::endl;
-        // 时间标定
-        if(currentCorrectionTime - cloudTimeCur < 0.2){
-            // 将后端位姿传给前端
-            // mtx.lock();
-            // LaserOdomPose[0] = mappedOdom_.pose.pose.position.x;
-            // LaserOdomPose[1] = mappedOdom_.pose.pose.position.y;
-            // LaserOdomPose[2] = mappedOdom_.pose.pose.position.z;
-            // double roll, pitch, yaw;
-            // tf::Quaternion quat;
-            // tf::quaternionMsgToTF(mappedOdom_.pose.pose.orientation, quat);
-            // tf::Matrix3x3(quat).getRPY(roll, pitch, yaw);
-            // LaserOdomPose[3] = roll;
-            // LaserOdomPose[4] = pitch;
-            // LaserOdomPose[5] = yaw;
-            // mtx.unlock();
-        }
         lastOdomTime = currentCorrectionTime;
         doneBackOpt = true;
     }
@@ -351,14 +356,14 @@ public:
         Rotation = transformation_interpolated.rotation().cast<double>();
         Translation = transformation_interpolated.translation().cast<double>();
 
-        Eigen::Vector3f rotation_euler;
-        float x, y, z;
-        pcl::getTranslationAndEulerAngles<float>(transformStep, 
-                                                    x, y, z,
-                                                    rotation_euler[0],
-                                                    rotation_euler[1], 
-                                                    rotation_euler[2]); 
-        std::cout << "rotation angles: " << std::endl << rotation_euler*180/M_PI << std::endl;
+        // Eigen::Vector3f rotation_euler;
+        // float x, y, z;
+        // pcl::getTranslationAndEulerAngles<float>(transformStep, 
+        //                                             x, y, z,
+        //                                             rotation_euler[0],
+        //                                             rotation_euler[1], 
+        //                                             rotation_euler[2]); 
+        // std::cout << "rotation angles: " << std::endl << rotation_euler*180/M_PI << std::endl;
 
         //* 平移配准
         // 首先进行旋转
@@ -366,7 +371,7 @@ public:
         pcl::transformPointCloud(*featureOld, *feature_rotated, transformation_interpolated);
         Eigen::Vector3d Reg_translation = Eigen::Vector3d::Zero();
         rot_vgicp.computeTranslation(*aligned, Reg_translation, Translation, TranslationOld, 0.1, 0.1);
-        std::cout << "Reg_translation: " << Reg_translation.transpose() << std::endl;
+        // std::cout << "Reg_translation: " << Reg_translation.transpose() << std::endl;
         Translation += Reg_translation;
     }
 
@@ -375,7 +380,6 @@ public:
         cloudTimeStamp = cloudIn->header.stamp;
         cloudTimeCur = cloudIn->header.stamp.toSec();
         laserCloudInfoBuf.push(*cloudIn);
-
         // 进行时间匹配
         ros::Time TimeCur = ros::Time::now();
         for(int i=0; i<laserCloudInfoBuf.size(); i++){
@@ -391,23 +395,15 @@ public:
         // 提取当前帧特征点云
         pcl::fromROSMsg(laserCloudInfoLast.extracted_corner,  *CloudCornerLast);
         pcl::fromROSMsg(laserCloudInfoLast.extracted_surface, *CloudSurfLast);
-        // pcl::fromROSMsg(laserCloudInfoLast.extracted_normal, *CloudGroundLast);
         pcl::fromROSMsg(laserCloudInfoLast.cloud_projected, *FullCloudLast);
-        // std::cout << "corner size: " << CloudCornerLast->size() << std::endl;
-        // std::cout << "surf size: " << CloudSurfLast->size() << std::endl;
-        // std::cout << "ground size: " << CloudGroundLast->size() << std::endl;
-        // std::cout << "full cloud size: " << FullCloudLast->size() << std::endl;
         *featureLast = *CloudCornerLast + *CloudSurfLast;
-        // *ground_and_cornerLast = *CloudCornerLast+*CloudGroundLast;
 
         if(isFirstFrame){
             isFirstFrame = false;
             *FullCloudOld = *FullCloudLast;
             *CloudCornerOld = *CloudCornerLast;
             *CloudSurfOld = *CloudSurfLast;
-            // *CloudGroundOld = *CloudGroundLast;
             *featureOld = *featureLast;
-            // *ground_and_cornerOld = *ground_and_cornerLast;
             return;
         }
 
@@ -420,19 +416,10 @@ public:
         }
 
         // 状态前向插值
-        // std::cout << "lastOdomTime: " << lastOdomTime << std::endl;
-        // std::cout << "doneBackOpt: " << doneBackOpt << std::endl;
         if(lastOdomTime != -1.0){   // 未初始化则不进行插值
-            // double latestInterval = doneBackOpt? cloudTimeCur - lastOdomTime : cloudTimeCur - cloudTimeLast;
             double latestInterval = cloudTimeCur - cloudTimeLast;
             
-            // std::cout << "lastMappingInterval: " << lastMappingInterval << std::endl;
-            // Affine3f transformation_interpolated = Affine3f::Identity();
-            // std::cout << "latestInterval: " << latestInterval << std::endl;
-            // std::cout << "lidarMappingAffine: \n" << lidarMappingAffine.matrix() << std::endl;
             stateLinearPropagation(lidarMappingAffine, lastMappingInterval, latestInterval, transformation_interpolated);
-            // transformation_interpolated = Affine3f::Identity();
-            // std::cout << "transformation_interpolated: \n" << transformation_interpolated.matrix() << std::endl;
             Rotation = transformation_interpolated.rotation().cast<double>();
             Translation = transformation_interpolated.translation().cast<double>();
             if(Translation.array().maxCoeff() > 5.0){
@@ -444,8 +431,7 @@ public:
         }
 
         scanRegeistration();
-        // std::cout << Rotation << std::endl;
-        // std::cout << "Translation: " << std::endl <<  Translation << std::endl;
+
         updateTransform();
         if(!failureFrameFlag){
             // 发布ROS消息和TF
@@ -459,11 +445,9 @@ public:
     }
 
     void updateTransform(){
-        // printf("111111111111111111111\n");
         Matrix4d trans = Matrix4d::Identity();
         trans << Rotation;
         trans.col(3) << Translation(0,0), Translation(1,0), Translation(2,0), 1.0;
-        // trans << Translation;
         size_t cloudSize = FullCloudLast->points.size();
 
         RegCloud->clear();
@@ -481,7 +465,6 @@ public:
         transformStep.matrix() = trans.cast<float>();
         Affine3f transformed_pose = transform_affine * transformStep.inverse(); // 仿射变换遵循右乘原则
         lidarMappingAffine = transformStep;
-        // printf("2222222222222222222222\n");
         
         auto end_time = std::chrono::system_clock::now();
         std::chrono::duration<double> elapsed_seconds = end_time - start_time;
@@ -489,16 +472,15 @@ public:
         //     failureFrameFlag = true;
         //     return;
         // }
-        // printf("33333333333333333333\n");
 
         start_time = end_time;
-        Vector3f rotation_euler;
-        float x, y, z;
-        pcl::getTranslationAndEulerAngles<float>(transformStep, 
-                                                 x, y, z,
-                                                 rotation_euler[0],
-                                                 rotation_euler[1], 
-                                                 rotation_euler[2]); 
+        // Vector3f rotation_euler;
+        // float x, y, z;
+        // pcl::getTranslationAndEulerAngles<float>(transformStep, 
+        //                                          x, y, z,
+        //                                          rotation_euler[0],
+        //                                          rotation_euler[1], 
+        //                                          rotation_euler[2]); 
         // std::cout << "rotation angles: " << std::endl << rotation_euler*180/M_PI << std::endl;
 
         pcl::getTranslationAndEulerAngles<float>(transformed_pose, 
@@ -508,16 +490,13 @@ public:
                                           LaserOdomPose[3], 
                                           LaserOdomPose[4], 
                                           LaserOdomPose[5]);                            
-        // printf("4444444444444444444\n");
 
         
         // 新旧信息交换
         *FullCloudOld = *FullCloudLast;
         *CloudCornerOld = *CloudCornerLast;
         *CloudSurfOld = *CloudSurfLast;
-        // *CloudGroundOld = *CloudGroundLast;
         *featureOld = *featureLast;
-        // *ground_and_cornerOld = *ground_and_cornerLast;
         TranslationOld = Translation;
     }
 
@@ -574,7 +553,7 @@ public:
 
         // 发布里程计
         laser_odom_incremental.header.frame_id = odometryFrame;
-        laser_odom_incremental.header.stamp = ros::Time::now();
+        laser_odom_incremental.header.stamp = cloudTimeStamp; //ros::Time::now();
         laser_odom_incremental.child_frame_id = "lidar_odometry";
         laser_odom_incremental.pose.pose = laser_pose.pose;
         pubLidarOdometry.publish(laser_odom_incremental);
@@ -601,7 +580,7 @@ public:
                                           trans_vec(0), trans_vec(1), trans_vec(2),
                                           trans_vec(3), trans_vec(4), trans_vec(5));
         trans_vec.tail(3) = Eigen::Matrix<float, 3, 1>::Zero();
-        std::cout << "transformation: \n" << trans_vec.transpose() << std::endl;
+        // std::cout << "transformation: \n" << trans_vec.transpose() << std::endl;
         trans_vec *= propagation_ratio;
         curr_trans = pcl::getTransformation(trans_vec(0), trans_vec(1), trans_vec(2),
                                             trans_vec(3), trans_vec(4), trans_vec(5));

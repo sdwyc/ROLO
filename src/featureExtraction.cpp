@@ -218,40 +218,6 @@ public:
                     {
                         cloudLabel[ind] = -1;           // 标记为平面点
                         cloudNeighborPicked[ind] = 1;   // 标记为选择过的点
-                        // // 判断是否为地面点
-                        // int ring_index = ind / Horizon_SCAN;
-                        // int horizon_index = ind % Horizon_SCAN;
-                        // if (ring_index < Ground_Scan_Ring-1){ // 线数判断
-                        //     if(horizon_index+1 < Horizon_SCAN){
-                        //         // int ring_index2 = ring_index+1;
-                        //         // if(ring_index >= Horizon_SCAN-1 )
-                        //         //     ring_index2 = Horizon_SCAN-1-ring_index;
-                        //         int k1 = horizon_index + (ring_index+1) * Horizon_SCAN;
-                        //         int k2 = horizon_index+1 + (ring_index+1) * Horizon_SCAN;
-                        //         int k3 = horizon_index+1 + ring_index * Horizon_SCAN;
-                        //         cv::Mat V1 = cv::Mat(3, 1, CV_32F, cv::Scalar::all(0));
-                        //         cv::Mat V2 = cv::Mat(3, 1, CV_32F, cv::Scalar::all(0));
-                        //         // 拟合平面
-                        //         V1.at<float>(0,0) = extractedCloud->points[k2].x - extractedCloud->points[k].x;
-                        //         V1.at<float>(1,0) = extractedCloud->points[k2].y - extractedCloud->points[k].y;
-                        //         V1.at<float>(2,0) = extractedCloud->points[k2].z - extractedCloud->points[k].z;
-                        //         V2.at<float>(0,0) = extractedCloud->points[k1].x - extractedCloud->points[k3].x;
-                        //         V2.at<float>(1,0) = extractedCloud->points[k1].y - extractedCloud->points[k3].y;
-                        //         V2.at<float>(2,0) = extractedCloud->points[k1].z - extractedCloud->points[k3].z;
-                        //         cv::Mat normV = V2.cross(V1); // 保证向量方向朝上
-                        //         float detVec = cv::norm(normV);
-                        //         normV = normV * (1.0/detVec);   // 单位化
-                        //         if(normV.at<float>(2,0) > cos(groundDegreeThre) ||
-                        //            normV.at<float>(2,0) < -1*cos(groundDegreeThre)){ // 默认雷达坐标系与地面坐标系垂直
-                        //             // 说明V1V2拟合平面的法向量与地面垂直向量几乎平行，则认为是地面点
-                        //             cloudLabel[ind] = -2;           // 说明既是平面点又是地面点
-                        //             // cloudLabel[k1] = -2;
-                        //             // cloudLabel[k2] = -2;
-                        //             // cloudLabel[k3] = -2;
-                        //             cloudNeighborPicked[ind] = 1;   // 标记为选择过的点
-                        //         }
-                        //     }
-                        // }
                         // 周围点不再选择
                         for (int l = 1; l <= 5; l++) {
 

@@ -267,11 +267,6 @@ public:
                 if (columnIdn >= Horizon_SCAN)
                     columnIdn -= Horizon_SCAN; // 为了能够首尾相接
             }
-            // else if (sensor == lidarType::LIVOX)
-            // {
-            //     columnIdn = columnIdnCountVec[rowIdn];
-            //     columnIdnCountVec[rowIdn] += 1;
-            // }
             
             if (columnIdn < 0 || columnIdn >= Horizon_SCAN)
                 continue;
