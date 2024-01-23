@@ -59,14 +59,24 @@ public:
   virtual void swapSourceAndTarget() {}
   virtual void clearSource() {}
   virtual void clearTarget() {}
+  void setOptimizerType(LSQ_OPTIMIZER_TYPE optimizier_type_);
 
 protected:
+
+  virtual void computeTranslation(PointCloudSource& output, Eigen::Vector3d& trans,
+                          const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
+                          const double interval_tn, const double interval_tn_1);
+
+  bool rot_step_lm(Eigen::Vector3d& t0, Eigen::Vector3d& delta);
+
   virtual void computeTransformation(PointCloudSource& output, const Matrix4& guess) override;
 
   bool is_converged(const Eigen::Isometry3d& delta) const;
 
   virtual double linearize(const Eigen::Isometry3d& trans, Eigen::Matrix<double, 6, 6>* H = nullptr, Eigen::Matrix<double, 6, 1>* b = nullptr) = 0;
   virtual double compute_error(const Eigen::Isometry3d& trans) = 0;
+  virtual double compute_t_error(const Eigen::Vector3d& trans, const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
+                                 const double& interval_tn, const double& interval_tn_1) = 0;
 
   bool step_optimize(Eigen::Isometry3d& x0, Eigen::Isometry3d& delta);
   bool step_gn(Eigen::Isometry3d& x0, Eigen::Isometry3d& delta);
@@ -75,6 +85,13 @@ protected:
   bool is_rot_converged(const Eigen::Isometry3d& delta) const;
   bool rot_step_lm(Eigen::Isometry3d& x0, Eigen::Isometry3d& delta);
   virtual double so3_linearize(const Eigen::Isometry3d& trans, Eigen::Matrix<double, 3, 3>* H = nullptr, Eigen::Matrix<double, 3, 1>* b = nullptr) {};
+  virtual double t3_linearize(const Eigen::Vector3d& trans, const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
+                              const double interval_tn, const double interval_tn_1,
+                              Eigen::Matrix<double, 6, 6>* H, Eigen::Matrix<double, 6, 1>* b) {};
+  bool step_t_optimize(Eigen::Vector3d& x0, Eigen::Vector3d& delta,
+                       const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
+                       const double& interval_tn, const double& interval_tn_1);
+  bool is_t_converged(const Eigen::Vector3d& delta) const;
 
 protected:
   double rotation_epsilon_;
