@@ -483,7 +483,7 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
                                                         Eigen::Matrix<double, 6, 6>* H, Eigen::Matrix<double, 6, 1>* b) {
 
   double sum_errors = 0.0;
-  double lambda = 1.0;
+  double lambda = 0.5;
   std::vector<Eigen::Matrix<double, 6, 6>, Eigen::aligned_allocator<Eigen::Matrix<double, 3, 3>>> Hs(num_threads_);
   std::vector<Eigen::Matrix<double, 6, 1>, Eigen::aligned_allocator<Eigen::Matrix<double, 3, 1>>> bs(num_threads_);
   for (int i = 0; i < num_threads_; i++) {
@@ -506,15 +506,25 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
     transform(0,3) =  trans(0);
     transform(1,3) =  trans(1);
     transform(2,3) =  trans(2);
+    
+    Eigen::Isometry3d propagation_transform = Eigen::Isometry3d::Identity();
+    propagation_transform.matrix().col(3).head<3>() = init_guess;
+    Eigen::Vector4d last_transform = Eigen::Vector4d::Zero();
+    last_transform.matrix().col(3).head<3>() = last_t0;
+
     const Eigen::Vector4d transed_mean_A = transform * mean_A; // 变换点
 
+    const Eigen::Vector4d begin_mean_A = propagation_transform.inverse() * mean_A; // 找到插值前的点
+
     const Eigen::Vector4d error = mean_B - transed_mean_A; // 均值误差
+
+    const Eigen::Vector4d ct_error = (begin_mean_A - transed_mean_A)/interval_tn - last_transform/interval_tn_1;
 
     double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
     const Eigen::Vector3d C_vel = (init_guess+trans)/interval_tn - last_t0/interval_tn_1;
     // double iter_error = w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda/pt_size * C_vel.transpose()*C_vel).value();
     // sum_errors += iter_error; // 残差计算
-    sum_errors += w * (error.transpose() * voxel_mahalanobis_[i] * error).value();
+    sum_errors += w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda * ct_error.transpose() * voxel_mahalanobis_[i] * ct_error).value();
 
     if (H == nullptr || b == nullptr) {
       continue;
@@ -523,9 +533,6 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
     // std::cout << "transed_mean_A" << transed_mean_A << std::endl;  
     // std::cout << "voxel_mahalanobis_so3" << voxel_mahalanobis_[i] << std::endl;  
     Eigen::Matrix3d voxel_mahalanobis_so3 = voxel_mahalanobis_[i].block<3,3>(0,0).matrix();
-
-    const Eigen::Matrix3d Omega0 = voxel_mahalanobis_so3 + lambda/(pt_size*interval_tn*interval_tn) * Eigen::Matrix3d::Identity();
-    const Eigen::Vector3d Omega1 = voxel_mahalanobis_so3 * error.head<3>() + lambda/(pt_size*interval_tn) * (init_guess/interval_tn - last_t0/interval_tn_1);
   
     if(isnan(w)){
       std::cout << "target_voxel->num_points: " << target_voxel->num_points << std::endl;
@@ -546,11 +553,13 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
     dtdx0.block<3, 3>(0, 0) = skewd(transed_mean_A.head<3>());
     dtdx0.block<3, 3>(0, 3) = -Eigen::Matrix3d::Identity();
 
-    Eigen::Matrix<double, 4, 6> jlossexp = dtdx0; // 雅可比矩阵
+    Eigen::Matrix<double, 4, 6> jlossexp1 = dtdx0; // 雅可比矩阵
+    Eigen::Matrix<double, 4, 6> jlossexp2 = 1.0 / interval_tn * dtdx0; // 雅可比矩阵
+
     // 海森矩阵
-    Eigen::Matrix<double, 6, 6> Hi = w * jlossexp.transpose() * voxel_mahalanobis_[i] * jlossexp;
+    Eigen::Matrix<double, 6, 6> Hi = w * (jlossexp1.transpose() * voxel_mahalanobis_[i] * jlossexp1 + jlossexp2.transpose() * voxel_mahalanobis_[i] * jlossexp2);
     // 偏置
-    Eigen::Matrix<double, 6, 1> bi = w * jlossexp.transpose() * voxel_mahalanobis_[i] * error;
+    Eigen::Matrix<double, 6, 1> bi = w * (jlossexp1.transpose() * voxel_mahalanobis_[i] * error + jlossexp2.transpose() * voxel_mahalanobis_[i] * ct_error);
     // std::cout << "Hi" << Hi << std::endl;  
     // std::cout << "bi" << bi << std::endl;  
 
@@ -579,7 +588,7 @@ template <typename PointSource, typename PointTarget>
 double RotVGICP<PointSource, PointTarget>::compute_t_error(const Eigen::Vector3d& trans, const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
                                                            const double& interval_tn, const double& interval_tn_1){
   double sum_errors = 0.0;
-  double lambda = 1.0;
+  double lambda = 0.5;
   size_t pt_size = voxel_correspondences_.size();
 
 #pragma omp parallel for num_threads(num_threads_) reduction(+ : sum_errors)
@@ -593,16 +602,28 @@ double RotVGICP<PointSource, PointTarget>::compute_t_error(const Eigen::Vector3d
     const Eigen::Vector4d mean_B = corr.second->mean_dir; // 体素栅格内的均值和协方差
 
     Eigen::Isometry3d transform = Eigen::Isometry3d::Identity();
-    transform.matrix().block<3, 1>(0, 3) = trans;
+    transform(0,3) =  trans(0);
+    transform(1,3) =  trans(1);
+    transform(2,3) =  trans(2);
+    
+    Eigen::Isometry3d propagation_transform = Eigen::Isometry3d::Identity();
+    propagation_transform.matrix().col(3).head<3>() = init_guess;
+    Eigen::Vector4d last_transform = Eigen::Vector4d::Identity();
+    last_transform.matrix().col(3).head<3>() = last_t0;
+
     const Eigen::Vector4d transed_mean_A = transform * mean_A; // 变换点
 
+    const Eigen::Vector4d begin_mean_A = propagation_transform.inverse() * mean_A; // 找到插值前的点
+
     const Eigen::Vector4d error = mean_B - transed_mean_A; // 均值误差
+
+    const Eigen::Vector4d ct_error = (begin_mean_A - transed_mean_A)/interval_tn - last_transform/interval_tn_1;
 
     double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
     const Eigen::Vector3d C_vel = (init_guess+trans)/interval_tn - last_t0/interval_tn_1;
     // double iter_error = w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda/pt_size * C_vel.transpose()*C_vel).value();
     // sum_errors += iter_error; // 残差计算
-    sum_errors += w * (error.transpose() * voxel_mahalanobis_[i] * error).value();
+    sum_errors += w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda * ct_error.transpose() * voxel_mahalanobis_[i] * ct_error).value();
 
   }
 
