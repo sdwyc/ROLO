@@ -101,7 +101,6 @@ public:
     float surfThreshold;
     int edgeFeatureMinValidNum;
     int surfFeatureMinValidNum;
-    float nearestSearchRadius;
 
     // voxel filter paprams
     float odometrySurfLeafSize;
@@ -182,7 +181,6 @@ public:
         nh.param<float>("rolo/surfThreshold", surfThreshold, 0.1);
         nh.param<int>("rolo/edgeFeatureMinValidNum", edgeFeatureMinValidNum, 10);
         nh.param<int>("rolo/surfFeatureMinValidNum", surfFeatureMinValidNum, 100);
-        nh.param<float>("rolo/nearestSearchRadius", nearestSearchRadius, 1.0);
 
         nh.param<float>("rolo/odometrySurfLeafSize", odometrySurfLeafSize, 0.2);
         nh.param<float>("rolo/mappingCornerLeafSize", mappingCornerLeafSize, 0.2);

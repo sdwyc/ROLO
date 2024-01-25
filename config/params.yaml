@@ -24,12 +24,10 @@ rolo:
   lidarNoiseBound: 0.05                     # lidar noise follows Guassian distribution, this is convariance
 
   # LOAM feature threshold
-  edgeThreshold: 1.0
+  edgeThreshold: 0.8
   surfThreshold: 0.1
-  edgeFeatureMinValidNum: 10
+  edgeFeatureMinValidNum: 20
   surfFeatureMinValidNum: 100
-  groundDegreeThre : 10
-  nearestSearchRadius: 0.2
   
   # voxel filter paprams
   odometrySurfLeafSize: 0.4                     # default: 0.4 - outdoor, 0.2 - indoor
@@ -45,7 +43,7 @@ rolo:
   mappingProcessInterval: 0.15                  # seconds, regulate mapping frequency
 
   # Surrounding map
-  surroundingkeyframeAddingDistThreshold: 1.0   # meters, regulate keyframe adding threshold
+  surroundingkeyframeAddingDistThreshold: 0.5   # meters, regulate keyframe adding threshold
   surroundingkeyframeAddingAngleThreshold: 0.2  # radians, regulate keyframe adding threshold
   surroundingKeyframeDensity: 2.0               # meters, downsample surrounding keyframe poses   
   surroundingKeyframeSearchRadius: 50.0         # meters, within n meters scan-to-map optimization (when loop closure disabled) 关键帧的搜索范围阈值
