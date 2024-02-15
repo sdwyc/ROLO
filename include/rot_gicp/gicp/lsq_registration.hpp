@@ -65,7 +65,7 @@ protected:
 
   virtual void computeTranslation(PointCloudSource& output, Eigen::Vector3d& trans,
                           const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
-                          const double interval_tn, const double interval_tn_1);
+                          const double interval_tn, const double interval_tn_1, const float ct_lambda);
 
   bool rot_step_lm(Eigen::Vector3d& t0, Eigen::Vector3d& delta);
 

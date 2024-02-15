@@ -54,13 +54,13 @@ double LsqRegistration<PointTarget, PointSource>::evaluateCost(const Eigen::Matr
 template <typename PointTarget, typename PointSource>
 void LsqRegistration<PointTarget, PointSource>::computeTranslation(PointCloudSource& output, Eigen::Vector3d& trans,
                                                                    const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
-                                                                   const double interval_tn, const double interval_tn_1) {
+                                                                   const double interval_tn, const double interval_tn_1, const float ct_lambda) {
   // Eigen::Vector3d t0 = Eigen::Vector3d(trans.template cast<double>());
   Eigen::Vector3d t0 = trans;
   lm_lambda_ = -1.0;
-  converged_ = false;
+  bool t_converged_ = false;
 
-  for (int i = 0; i < max_iterations_ && !converged_; i++) {
+  for (int i = 0; i < max_iterations_ && !t_converged_; i++) {
     nr_iterations_ = i;
     Eigen::Vector3d delta_t;  // delta是每次迭代的变化量（更新量），x0为最终要输出的变换，x0=Sigma(delta)
     if (!step_t_optimize(t0, delta_t, init_guess, last_t0, interval_tn, interval_tn_1)) {
@@ -68,7 +68,7 @@ void LsqRegistration<PointTarget, PointSource>::computeTranslation(PointCloudSou
       break;
     }
 
-    // converged_ = is_converged(delta_t);
+    t_converged_ = is_t_converged(delta_t);
   }
   // std::cout << "Optimized over!!" << std::endl;
 

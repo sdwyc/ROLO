@@ -31,6 +31,7 @@ RotVGICP<PointSource, PointTarget>::RotVGICP() : LsqRegistration<PointSource, Po
   search_source_.reset(new SearchMethodSource);
   search_target_.reset(new SearchMethodTarget);
   voxel_resolution_ = 1.0;
+  lambda_ = 1.0;
   search_method_ = NeighborSearchMethod::DIRECT1;
   voxel_mode_ = VoxelAccumulationMode::ADDITIVE;
 }
@@ -151,8 +152,9 @@ void RotVGICP<PointSource, PointTarget>::computeTransformation(PointCloudSource&
 template <typename PointSource, typename PointTarget>
 void RotVGICP<PointSource, PointTarget>::computeTranslation(PointCloudSource& output, Eigen::Vector3d& trans,
                         const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
-                        const double interval_tn, const double interval_tn_1) {
-  LsqRegistration<PointSource, PointTarget>::computeTranslation(output, trans, init_guess, last_t0, interval_tn, interval_tn_1);
+                        const double interval_tn, const double interval_tn_1, const float ct_lambda) {
+  lambda_ = ct_lambda;
+  LsqRegistration<PointSource, PointTarget>::computeTranslation(output, trans, init_guess, last_t0, interval_tn, interval_tn_1, ct_lambda);
   // voxelmap_.reset();
 }
 
@@ -467,6 +469,9 @@ bool RotVGICP<PointSource, PointTarget>::calculate_covariances(
           values = svd.singularValues() / svd.singularValues().maxCoeff();
           values = values.array().max(1e-3);
           break;
+        case RegularizationMethod::PLANE_S:
+          values = svd.singularValues() / svd.singularValues().sum();
+          values(2) = 1e-3;
       }
 
       covariances[i].setZero();
@@ -481,9 +486,18 @@ template <typename PointSource, typename PointTarget>
 double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& trans, const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
                                                         const double interval_tn, const double interval_tn_1,
                                                         Eigen::Matrix<double, 6, 6>* H, Eigen::Matrix<double, 6, 1>* b) {
+  // 若没有构建体素地图，先构建体素地图
+  if (voxelmap_ == nullptr) {
+    voxelmap_.reset(new VmfVoxelMap<PointTarget>(voxel_resolution_, voxel_mode_));
+    voxelmap_->create_voxelmap(*target_, target_covs_);
+  }
 
+
+  Eigen::Isometry3d tranform = Eigen::Isometry3d::Identity();
+  tranform.matrix().col(3).head<3>() = trans;
+  update_correspondences(tranform);
+  
   double sum_errors = 0.0;
-  double lambda = 0.5;
   std::vector<Eigen::Matrix<double, 6, 6>, Eigen::aligned_allocator<Eigen::Matrix<double, 3, 3>>> Hs(num_threads_);
   std::vector<Eigen::Matrix<double, 6, 1>, Eigen::aligned_allocator<Eigen::Matrix<double, 3, 1>>> bs(num_threads_);
   for (int i = 0; i < num_threads_; i++) {
@@ -524,7 +538,7 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
     const Eigen::Vector3d C_vel = (init_guess+trans)/interval_tn - last_t0/interval_tn_1;
     // double iter_error = w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda/pt_size * C_vel.transpose()*C_vel).value();
     // sum_errors += iter_error; // 残差计算
-    sum_errors += w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda * ct_error.transpose() * voxel_mahalanobis_[i] * ct_error).value();
+    sum_errors += w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda_/pt_size * ct_error.transpose() * voxel_mahalanobis_[i] * ct_error).value();
 
     if (H == nullptr || b == nullptr) {
       continue;
@@ -542,12 +556,6 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
       std::cout << "target_voxel->mean_dir: " << target_voxel->mean_dir << std::endl;
     }
 
-    // 海森矩阵
-    // Eigen::Matrix<double, 3, 3> Hi = w * Omega0;
-    // Eigen::Matrix<double, 3, 3> Hi = w * voxel_mahalanobis_so3;
-    // 偏置
-    // Eigen::Matrix<double, 3, 1> bi = w * (Omega0*trans+Omega1);
-    // Eigen::Matrix<double, 3, 1> bi = w * voxel_mahalanobis_so3 * (trans+error.head<3>());
     // 利用李代数扰动模型，对位姿进行求导，得到雅可比矩阵
     Eigen::Matrix<double, 4, 6> dtdx0 = Eigen::Matrix<double, 4, 6>::Zero();
     dtdx0.block<3, 3>(0, 0) = skewd(transed_mean_A.head<3>());
@@ -557,9 +565,9 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
     Eigen::Matrix<double, 4, 6> jlossexp2 = 1.0 / interval_tn * dtdx0; // 雅可比矩阵
 
     // 海森矩阵
-    Eigen::Matrix<double, 6, 6> Hi = w * (jlossexp1.transpose() * voxel_mahalanobis_[i] * jlossexp1 + jlossexp2.transpose() * voxel_mahalanobis_[i] * jlossexp2);
+    Eigen::Matrix<double, 6, 6> Hi = w * (jlossexp1.transpose() * voxel_mahalanobis_[i] * jlossexp1 + lambda_/pt_size * jlossexp2.transpose() * voxel_mahalanobis_[i] * jlossexp2);
     // 偏置
-    Eigen::Matrix<double, 6, 1> bi = w * (jlossexp1.transpose() * voxel_mahalanobis_[i] * error + jlossexp2.transpose() * voxel_mahalanobis_[i] * ct_error);
+    Eigen::Matrix<double, 6, 1> bi = w * (jlossexp1.transpose() * voxel_mahalanobis_[i] * error + lambda_/pt_size * jlossexp2.transpose() * voxel_mahalanobis_[i] * ct_error);
     // std::cout << "Hi" << Hi << std::endl;  
     // std::cout << "bi" << bi << std::endl;  
 
@@ -587,8 +595,12 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
 template <typename PointSource, typename PointTarget>
 double RotVGICP<PointSource, PointTarget>::compute_t_error(const Eigen::Vector3d& trans, const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
                                                            const double& interval_tn, const double& interval_tn_1){
+
+  // Eigen::Isometry3d tranform = Eigen::Isometry3d::Identity();
+  // tranform.matrix().col(3).head<3>() = trans;
+  // update_correspondences(tranform);
+
   double sum_errors = 0.0;
-  double lambda = 0.5;
   size_t pt_size = voxel_correspondences_.size();
 
 #pragma omp parallel for num_threads(num_threads_) reduction(+ : sum_errors)
@@ -623,7 +635,7 @@ double RotVGICP<PointSource, PointTarget>::compute_t_error(const Eigen::Vector3d
     const Eigen::Vector3d C_vel = (init_guess+trans)/interval_tn - last_t0/interval_tn_1;
     // double iter_error = w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda/pt_size * C_vel.transpose()*C_vel).value();
     // sum_errors += iter_error; // 残差计算
-    sum_errors += w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda * ct_error.transpose() * voxel_mahalanobis_[i] * ct_error).value();
+    sum_errors += w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda_/pt_size * ct_error.transpose() * voxel_mahalanobis_[i] * ct_error).value();
 
   }
 
