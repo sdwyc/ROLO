@@ -6,6 +6,10 @@ int32[] endRingIndex
 int32[]  pointColInd # point column index in range image
 float32[] pointRange # point range
 
+float32 startOrientation
+float32 endOrientation
+float32 orientationDiff
+
 # Initial guess from front lidar odometry
 float32 initialGuessX
 float32 initialGuessY

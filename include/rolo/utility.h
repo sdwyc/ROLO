@@ -95,6 +95,7 @@ public:
     float lidarMinRange;
     float lidarMaxRange;
     float lidarNoiseBound;
+    bool deskewEnabled;
 
     // LOAM
     float edgeThreshold;
@@ -113,6 +114,9 @@ public:
     // CPU Params
     int numberOfCores;
     double mappingProcessInterval;
+
+    // Scan Registration
+    float CT_lambda;
 
     // Surrounding map
     float surroundingkeyframeAddingDistThreshold; 
@@ -176,6 +180,7 @@ public:
         nh.param<float>("rolo/lidarMinRange", lidarMinRange, 1.0);
         nh.param<float>("rolo/lidarMaxRange", lidarMaxRange, 1000.0);
         nh.param<float>("rolo/lidarNoiseBound", lidarNoiseBound, 0.05);
+        nh.param<bool>("rolo/deskewEnabled", deskewEnabled, true);
 
         nh.param<float>("rolo/edgeThreshold", edgeThreshold, 0.1);
         nh.param<float>("rolo/surfThreshold", surfThreshold, 0.1);
@@ -192,6 +197,8 @@ public:
         nh.param<int>("rolo/numberOfCores", numberOfCores, 2);
         nh.param<double>("rolo/mappingProcessInterval", mappingProcessInterval, 0.15);
 
+        nh.param<float>("rolo/continuousTrajectoryWeight", CT_lambda, 1.0);
+        
         nh.param<float>("rolo/surroundingkeyframeAddingDistThreshold", surroundingkeyframeAddingDistThreshold, 1.0);
         nh.param<float>("rolo/surroundingkeyframeAddingAngleThreshold", surroundingkeyframeAddingAngleThreshold, 0.2);
         nh.param<float>("rolo/surroundingKeyframeDensity", surroundingKeyframeDensity, 1.0);

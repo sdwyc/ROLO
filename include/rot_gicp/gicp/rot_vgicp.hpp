@@ -100,7 +100,7 @@ public:
 
   virtual void computeTranslation(PointCloudSource& output, Eigen::Vector3d& trans,
                           const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
-                          const double interval_tn, const double interval_tn_1);
+                          const double interval_tn, const double interval_tn_1, const float ct_lambda);
 
 protected:
   virtual void computeTransformation(PointCloudSource& output, const Matrix4& guess) override;
@@ -119,6 +119,7 @@ protected:
 
 protected:
   double voxel_resolution_;
+  float lambda_;
   NeighborSearchMethod search_method_;
   VoxelAccumulationMode voxel_mode_;
 

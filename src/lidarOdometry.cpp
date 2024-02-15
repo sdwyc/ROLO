@@ -329,7 +329,7 @@ public:
     }
 
     void scanRegeistration(){
-        // auto end = std::chrono::system_clock::now();
+        auto start = std::chrono::system_clock::now();
         // std::chrono::duration<double> elapsed_seconds = end - start;
         // printf("Solver Duration: %f ms.\n" ,elapsed_seconds.count() * 1000);
 
@@ -348,13 +348,16 @@ public:
         rot_vgicp.setInputTarget(featureLast);
         rot_vgicp.setInputSource(feature_propagated);
         rot_vgicp.align(*aligned);
-        Eigen::Matrix4f trans = rot_vgicp.getFinalTransformation();
+        Eigen::Matrix4f trans = rot_vgicp.getFinalTransformation(); // 旋转估计
         // Rotation = trans.block<3, 3>(0, 0).cast<float>() * Rotation.eval();
         Eigen::Affine3f transformStep;
         transformStep.matrix() = trans.cast<float>();
         transformation_interpolated = transformation_interpolated * transformStep;
         Rotation = transformation_interpolated.rotation().cast<double>();
         Translation = transformation_interpolated.translation().cast<double>();
+        auto r_end = std::chrono::system_clock::now();
+        std::chrono::duration<double> r_elapsed_seconds = r_end - start;
+        printf("Rotation Solver Duration: %f ms.\n" ,r_elapsed_seconds.count() * 1000);
 
         // Eigen::Vector3f rotation_euler;
         // float x, y, z;
@@ -370,8 +373,12 @@ public:
         aligned->clear();
         pcl::transformPointCloud(*featureOld, *feature_rotated, transformation_interpolated);
         Eigen::Vector3d Reg_translation = Eigen::Vector3d::Zero();
-        rot_vgicp.computeTranslation(*aligned, Reg_translation, Translation, TranslationOld, 0.1, 0.1);
+        rot_vgicp.computeTranslation(*aligned, Reg_translation, Translation, TranslationOld, 0.1, 0.1, CT_lambda);
         // std::cout << "Reg_translation: " << Reg_translation.transpose() << std::endl;
+        auto t_end = std::chrono::system_clock::now();
+        std::chrono::duration<double> t_elapsed_seconds = t_end - r_end;
+        printf("Translation Solver Duration: %f ms.\n" ,t_elapsed_seconds.count() * 1000);
+
         Translation += Reg_translation;
     }
 
@@ -591,10 +598,10 @@ int main(int argc, char** argv)
 {
     ros::init(argc, argv, "rolo");
     
+    ROS_INFO("\033[1;32m----> Laser Odometry Started.\033[0m");
     LidarOdometry LO;
     TransformFusion TF;
     
-    ROS_INFO("\033[1;32m----> Laser Odometry Started.\033[0m");
 
     ros::MultiThreadedSpinner spinner(2);
     spinner.spin();

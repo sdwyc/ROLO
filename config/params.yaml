@@ -22,6 +22,7 @@ rolo:
   lidarMinRange: 2.0                          # default: 1.0, minimum lidar range to be used
   lidarMaxRange: 1000.0                       # default: 1000.0, maximum lidar range to be used
   lidarNoiseBound: 0.05                     # lidar noise follows Guassian distribution, this is convariance
+  deskewEnabled: true                         # Enable flag for laser deskew
 
   # LOAM feature threshold
   edgeThreshold: 0.8
@@ -42,6 +43,9 @@ rolo:
   numberOfCores: 8                              # number of cores for mapping optimization
   mappingProcessInterval: 0.15                  # seconds, regulate mapping frequency
 
+  # Scan Reagistration
+  continuousTrajectoryWeight: 0.3
+
   # Surrounding map
   surroundingkeyframeAddingDistThreshold: 0.5   # meters, regulate keyframe adding threshold
   surroundingkeyframeAddingAngleThreshold: 0.2  # radians, regulate keyframe adding threshold
@@ -49,7 +53,7 @@ rolo:
   surroundingKeyframeSearchRadius: 50.0         # meters, within n meters scan-to-map optimization (when loop closure disabled) 关键帧的搜索范围阈值
 
   # Loop closure
-  loopClosureEnableFlag: true
+  loopClosureEnableFlag: false
   loopClosureFrequency: 1.0                     # Hz, regulate loop closure constraint add frequency
   surroundingKeyframeSize: 50                   # submap size (when loop closure enabled)
   historyKeyframeSearchRadius: 30.0             # meters, key frame that is within n meters from current pose will be considerd for loop closure
