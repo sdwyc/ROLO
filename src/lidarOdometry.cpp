@@ -276,7 +276,7 @@ public:
     {
 
         // mapOptimization传来的里程计数据
-        subOdometryMapped = nh.subscribe<nav_msgs::Odometry>("rolo/mapping/odometry", 10, &LidarOdometry::odometryHandler, this, ros::TransportHints().tcpNoDelay());
+        subOdometryMapped = nh.subscribe<nav_msgs::Odometry>("rolo/mapping/odometry_incremental", 10, &LidarOdometry::odometryHandler, this, ros::TransportHints().tcpNoDelay());
         // 接受imu原始数据
         subCloudInfo = nh.subscribe<rolo::CloudInfoStamp>("rolo/feature/cloud_info", 10, &LidarOdometry::cloudHandler, this, ros::TransportHints().tcpNoDelay());
         // 发布imu预测里程计
@@ -346,8 +346,11 @@ public:
         rot_vgicp.clearTarget();
         rot_vgicp.clearSource();
         rot_vgicp.setInputTarget(featureLast);
+
         rot_vgicp.setInputSource(feature_propagated);
+
         rot_vgicp.align(*aligned);
+
         Eigen::Matrix4f trans = rot_vgicp.getFinalTransformation(); // 旋转估计
         // Rotation = trans.block<3, 3>(0, 0).cast<float>() * Rotation.eval();
         Eigen::Affine3f transformStep;
@@ -374,6 +377,7 @@ public:
         pcl::transformPointCloud(*featureOld, *feature_rotated, transformation_interpolated);
         Eigen::Vector3d Reg_translation = Eigen::Vector3d::Zero();
         rot_vgicp.computeTranslation(*aligned, Reg_translation, Translation, TranslationOld, 0.1, 0.1, CT_lambda);
+
         // std::cout << "Reg_translation: " << Reg_translation.transpose() << std::endl;
         auto t_end = std::chrono::system_clock::now();
         std::chrono::duration<double> t_elapsed_seconds = t_end - r_end;

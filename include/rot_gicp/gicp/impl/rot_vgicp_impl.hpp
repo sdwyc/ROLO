@@ -123,7 +123,6 @@ void RotVGICP<PointSource, PointTarget>::setInputTarget(const PointCloudTargetCo
   if (target_ == cloud) {
     return;
   }
-
   pcl::Registration<PointSource, PointTarget, Scalar>::setInputTarget(cloud);
   search_target_->setInputCloud(cloud);
   target_covs_.clear();
@@ -491,7 +490,6 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
     voxelmap_.reset(new VmfVoxelMap<PointTarget>(voxel_resolution_, voxel_mode_));
     voxelmap_->create_voxelmap(*target_, target_covs_);
   }
-
 
   Eigen::Isometry3d tranform = Eigen::Isometry3d::Identity();
   tranform.matrix().col(3).head<3>() = trans;

@@ -5,10 +5,9 @@
     <!-- Parameters -->
     <rosparam file="$(find rolo)/config/params.yaml" command="load" />
     <node pkg="tf" type="static_transform_publisher" name="velodyne2base" args="0 0 0 0 0 0 /base_link /velodyne 10" />
-
-    <!-- <rosparam file="$(find rolo)/config/params.yaml" command="load" />
-    <node pkg="tf" type="static_transform_publisher" name="velodyne2base" args="0 0 0 0 0 0 /base_link /velodyne 100"/> -->
-    <!-- <node pkg="tf" type="static_transform_publisher" name="base2lidar" args="0 0 0 0 0 0 /base_link /os_sensor 100" /> -->
+    
+    <!-- <rosparam file="$(find rolo)/config/params_os.yaml" command="load" />
+    <node pkg="tf" type="static_transform_publisher" name="base2ouster" args="0 0 0 0 0 0 /base_link /os_sensor 10" /> -->
 
     <!--- LOAM -->
     <include file="$(find rolo)/launch/module_loam.launch" />
