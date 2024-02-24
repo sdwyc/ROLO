@@ -541,7 +541,7 @@ public:
                 if (LMOptimization(iterCount) == true)
                     break;              
             }
-            // 加权融合imu数据
+            // 更新位姿
             transformUpdate();
         } else {
             ROS_WARN("Not enough features! Only %d edge and %d planar features available.", laserCloudCornerLastDSNum, laserCloudSurfLastDSNum);

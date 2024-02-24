@@ -16,16 +16,31 @@ rolo:
 
   # Sensor Settings
   sensor: velodyne                            # lidar sensor type, 'velodyne' or 'ouster' or 'livox'
-  N_SCAN: 32                                  # number of lidar channel (i.e., Velodyne/Ouster: 16, 32, 64, 128, Livox Horizon: 6)
+  N_SCAN: 64                                  # number of lidar channel (i.e., Velodyne/Ouster: 16, 32, 64, 128, Livox Horizon: 6)
   Horizon_SCAN: 1800                          # lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048, Livox Horizon: 4000)
-  downsampleRate: 1                           # default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
-  lidarMinRange: 2.0                          # default: 1.0, minimum lidar range to be used
+  downsampleRate: 2                           # default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
+  lidarMinRange: 1.0                          # default: 1.0, minimum lidar range to be used
   lidarMaxRange: 1000.0                       # default: 1000.0, maximum lidar range to be used
   lidarNoiseBound: 0.05                     # lidar noise follows Guassian distribution, this is convariance
-  deskewEnabled: true                         # Enable flag for laser deskew
+  deskewEnabled: false                         # Enable flag for laser deskew
+  
+  useAutoRing: true
+  # angResH: 0.2
+  # angResV: 2.0
+  # angBottom: 15.0
+
+  # HDL-32E
+  # angResH: 0.2            # 360.0/float(Horizon_SCAN)
+  # angResV: 1.33           # 41.33/float(N_SCAN-1)
+  # angBottom: 30.67          
+
+  # HDL-64E
+  angResH: 0.2
+  angResV: 0.43           # 26.8/float(N_SCAN-1)
+  angBottom: 24.8         
 
   # LOAM feature threshold
-  edgeThreshold: 0.8
+  edgeThreshold: 1.0
   surfThreshold: 0.1
   edgeFeatureMinValidNum: 20
   surfFeatureMinValidNum: 100

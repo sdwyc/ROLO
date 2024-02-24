@@ -76,6 +76,7 @@ private:
 
     std::string timeField; 
     int timeFlag = 0;
+    int ringFlag =0;
     float scanPeriod = 0.1;
     double odomTimeDiff = -1.0;
     float odomIncreX, odomIncreY, odomIncreZ, odomIncreRoll, odomIncrePitch, odomIncreYaw;
@@ -188,7 +189,8 @@ public:
         // 根据雷达类型，转换为相应的点云格式
         if (sensor == lidarType::VELODYNE)
         {
-            pcl::moveFromROSMsg(currentCloudMsg, *laserCloudIn);
+            // pcl::moveFromROSMsg(currentCloudMsg, *laserCloudIn);
+            pcl::fromROSMsg(currentCloudMsg, *laserCloudIn);
         }
         else if (sensor == lidarType::OUSTER)
         {
@@ -229,7 +231,6 @@ public:
             ROS_ERROR("Point cloud is not in dense format, please remove NaN points first!");
             ros::shutdown();
         }
-        static int ringFlag =0;
         // check ring channel
         if (ringFlag == 0)
         {
@@ -240,9 +241,11 @@ public:
                 if (currentCloudMsg.fields[i].name == "ring")
                 {
                     ringFlag = 1;
-                    ROS_WARN("Point cloud ring field available!");
+                    ROS_INFO("Point cloud ring field is available!");
                     break;
                 }
+                else
+                    ROS_WARN("Point cloud ring field is not available!");
             }
         }
         // check point time field
@@ -254,9 +257,11 @@ public:
                 if (currentCloudMsg.fields[i].name == timeField)
                 {
                     timeFlag = 1;
-                    ROS_WARN("Point cloud time field available!");
+                    ROS_INFO("Point cloud time field available!");
                     break;
                 }
+                else
+                    ROS_WARN("Point cloud time field is not available!");
             }
         }
         return true;
@@ -413,15 +418,22 @@ public:
             // 距离滤波
             if (range < lidarMinRange || range > lidarMaxRange)
                 continue;
-            // 行索引为扫瞄线数
-            float angle = atan(laserCloudIn->points[i].z / sqrt(laserCloudIn->points[i].x * laserCloudIn->points[i].x + laserCloudIn->points[i].y * laserCloudIn->points[i].y)) * 180 / M_PI; // 点到基座的俯仰角，单位：degree
-            int scanID = 0;
+
             // 判断一个点属于哪个线上的点，scanID为线数的序列号
-            scanID = int((angle + 15) / 2 + 0.5);
-            // std::cout << "point ring: " << scanID << std::endl;
-            if (scanID > (N_SCAN - 1) || scanID < 0)
-            {
-                continue;
+            int scanID = 0;
+            if(ringFlag == 1){
+                scanID = laserCloudIn->points[i].ring;
+                if (scanID > (N_SCAN - 1) || scanID < 0)
+                {
+                    continue;
+                }
+            }
+            else{
+                if(!useAutoRing){
+                    ROS_ERROR("Point 'ring' field is not available, Trun param 'useAutoRing' to true!");
+                }
+                float verticalAngle = atan2(thisPoint.z, sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y)) * 180 / M_PI;
+                scanID = (verticalAngle + ang_bottom + 0.1) / ang_res_v;
             }
             int rowIdn = scanID;
             // int rowIdn = laserCloudIn->points[i].ring;

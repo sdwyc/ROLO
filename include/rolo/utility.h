@@ -96,6 +96,10 @@ public:
     float lidarMaxRange;
     float lidarNoiseBound;
     bool deskewEnabled;
+    bool useAutoRing;
+    float ang_res_h;
+    float ang_res_v;
+    float ang_bottom;
 
     // LOAM
     float edgeThreshold;
@@ -181,6 +185,10 @@ public:
         nh.param<float>("rolo/lidarMaxRange", lidarMaxRange, 1000.0);
         nh.param<float>("rolo/lidarNoiseBound", lidarNoiseBound, 0.05);
         nh.param<bool>("rolo/deskewEnabled", deskewEnabled, true);
+        nh.param<bool>("rolo/useAutoRing", useAutoRing, true);
+        nh.param<float>("rolo/angResH", ang_res_h, 0.2);
+        nh.param<float>("rolo/angResV", ang_res_v, 2.0);
+        nh.param<float>("rolo/angBottom", ang_bottom, 15.0);
 
         nh.param<float>("rolo/edgeThreshold", edgeThreshold, 0.1);
         nh.param<float>("rolo/surfThreshold", surfThreshold, 0.1);
