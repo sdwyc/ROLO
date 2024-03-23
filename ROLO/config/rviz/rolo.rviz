@@ -3,7 +3,8 @@ Panels:
     Help Height: 191
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /links1
       Splitter Ratio: 0.6000000238418579
     Tree Height: 548
   - Class: rviz/Selection
@@ -21,7 +22,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: Map (cloud)
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -66,12 +67,12 @@ Visualization Manager:
           Update Interval: 0
           Value: false
         - Class: rviz/Axes
-          Enabled: false
+          Enabled: true
           Length: 2
           Name: map
           Radius: 0.5
           Reference Frame: map
-          Value: false
+          Value: true
         - Class: rviz/Axes
           Enabled: true
           Length: 1
@@ -601,25 +602,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 33.43263626098633
+      Distance: 26.293731689453125
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.13579726219177246
-        Y: 0.07730069011449814
-        Z: -0.5083178877830505
+        X: 0.03279125690460205
+        Y: 0.1666317582130432
+        Z: -0.05467548966407776
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.41479796171188354
+      Pitch: 0.4197981357574463
       Target Frame: base_link
       Value: Orbit (rviz)
-      Yaw: 4.649753570556641
+      Yaw: 3.154743194580078
     Saved: ~
 Window Geometry:
   Displays:

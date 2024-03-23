@@ -25,6 +25,7 @@
 #include <rot_gicp/gicp/rot_vgicp.hpp>
 
 using namespace Eigen;
+ofstream tum_file;
 
 //! 获取给定odom消息所代表的变换矩阵
 Eigen::Affine3f odom2affine(nav_msgs::Odometry odom) // Eigen::Affine3f为仿射变换矩阵，旋转矩阵和平移矩阵的结合
@@ -264,8 +265,8 @@ private:
     Matrix3d Rotation;
     Vector3d Translation;
     Vector3d TranslationOld;
-    float LaserOdomPose[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // [x, y, z, roll, pitch, yaw]
-
+    // float LaserOdomPose[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // [x, y, z, roll, pitch, yaw]
+    float LaserOdomPose[6] = {initPose[0], initPose[1], initPose[2], initPose[3], initPose[4], initPose[5]}; // [x, y, z, roll, pitch, yaw]
 
 public:  
     LidarOdometry():
@@ -362,15 +363,6 @@ public:
         std::chrono::duration<double> r_elapsed_seconds = r_end - start;
         printf("Rotation Solver Duration: %f ms.\n" ,r_elapsed_seconds.count() * 1000);
 
-        // Eigen::Vector3f rotation_euler;
-        // float x, y, z;
-        // pcl::getTranslationAndEulerAngles<float>(transformStep, 
-        //                                             x, y, z,
-        //                                             rotation_euler[0],
-        //                                             rotation_euler[1], 
-        //                                             rotation_euler[2]); 
-        // std::cout << "rotation angles: " << std::endl << rotation_euler*180/M_PI << std::endl;
-
         //* 平移配准
         // 首先进行旋转
         aligned->clear();
@@ -391,6 +383,7 @@ public:
         cloudTimeStamp = cloudIn->header.stamp;
         cloudTimeCur = cloudIn->header.stamp.toSec();
         laserCloudInfoBuf.push(*cloudIn);
+        auto f_start = std::chrono::system_clock::now();
         // 进行时间匹配
         ros::Time TimeCur = ros::Time::now();
         for(int i=0; i<laserCloudInfoBuf.size(); i++){
@@ -453,6 +446,11 @@ public:
             printf(" Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n "); 
             failureFrameFlag = false;
         }
+        auto f_end = std::chrono::system_clock::now();
+        std::chrono::duration<double> r_elapsed_seconds = f_end - f_start;
+        // 保存前段时间消耗
+        tum_file << setprecision(19) << cloudTimeCur << " " 
+                 << r_elapsed_seconds.count() * 1000 << std::endl;
     }
 
     void updateTransform(){
@@ -605,11 +603,17 @@ int main(int argc, char** argv)
     ROS_INFO("\033[1;32m----> Laser Odometry Started.\033[0m");
     LidarOdometry LO;
     TransformFusion TF;
-    
+    if(!LO.loopClosureEnableFlag){
+        tum_file.open("/home/sdu/slam_time/rolo/rolo_front.tum");
+    }
+    else{
+        tum_file.open("/home/sdu/slam_time/rolo_lc/rolo_lc_front.tum");
+    }
+    tum_file.clear();
 
     ros::MultiThreadedSpinner spinner(2);
     spinner.spin();
     // ros::spin();
-    
+    tum_file.close();
     return 0;
 }

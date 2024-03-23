@@ -3,13 +3,17 @@ rolo:
   # Topics
   pointCloudTopic: "ouster/points"               # Point cloud data
   odomTopic: "odometry/lidar"                   # Front end LiDAR odometry, same frequency as LiDAR pointcloud
+  gpsTopic: "gps/fix"                           # GPS topic for visualization in satellite
+  useGPS: true                                 # GPS message enable
+  gpsPublishFreq: 10.0                          # GPS topic publish frequency
 
   # Frames
   lidarFrame: "os_sensor"
   baselinkFrame: "base_link"
   odometryFrame: "odometry"
   mapFrame: "map"
-  
+  initPose: [0.0, 0.0, 0.0, 0.0, 0.0, 180.0]   # Initialization for first pose, degree form, [x, y, z, roll, pitch, yaw]
+
   # Export settings
   savePCD: false                              # The enable setting for save global keyframes
   savePCDDirectory: "/Downloads/LOAM/"        # Save path of map in your home folder, starts and ends with "/".

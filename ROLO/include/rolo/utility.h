@@ -76,12 +76,16 @@ public:
     //Topics
     string pointCloudTopic; // 输入的激光
     string odomTopic;
+    string gpsTopic;
+    bool useGPS;
+    float gpsPublishFreq;
 
     //Frames
     string lidarFrame;
     string baselinkFrame;
     string odometryFrame;
     string mapFrame;
+    std::vector<double> initPose;
 
     // Save pcd
     bool savePCD;
@@ -148,12 +152,18 @@ public:
 
         nh.param<std::string>("rolo/pointCloudTopic", pointCloudTopic, "points_raw");
         nh.param<std::string>("rolo/odomTopic", odomTopic, "odometry/imu");
+        nh.param<std::string>("rolo/gpsTopic", gpsTopic, "gps/fix");
+        nh.param<bool>("rolo/useGPS", useGPS, false);
+        nh.param<float>("rolo/gpsPublishFreq", gpsPublishFreq, 1.0);
 
         nh.param<std::string>("rolo/lidarFrame", lidarFrame, "base_link");
         nh.param<std::string>("rolo/baselinkFrame", baselinkFrame, "base_link");
         nh.param<std::string>("rolo/odometryFrame", odometryFrame, "odom");
         nh.param<std::string>("rolo/mapFrame", mapFrame, "map");
-
+        nh.param<vector<double>>("rolo/initPose", initPose, vector<double>());
+        for(int i=3; i<initPose.size(); i++){
+          initPose[i] = initPose[i] * (M_PI/180.0);
+        }
         nh.param<bool>("rolo/savePCD", savePCD, false);
         nh.param<std::string>("rolo/savePCDDirectory", savePCDDirectory, "/Downloads/LOAM/");
 

@@ -15,6 +15,9 @@
 
 #include <gtsam/nonlinear/ISAM2.h>
 #include <ros/package.h>
+#include <GeographicLib/Geocentric.hpp>
+#include <GeographicLib/LocalCartesian.hpp>
+#include <GeographicLib/Geoid.hpp>
 
 using namespace gtsam;
 
@@ -45,6 +48,7 @@ POINT_CLOUD_REGISTER_POINT_STRUCT (PointXYZIRPYT,
                                    (double, time, time))
 
 typedef PointXYZIRPYT  PointTypePose;
+ofstream back_tum_file;
 
 class backMapping : public ParamLoader
 {
@@ -71,6 +75,7 @@ public:
     ros::Publisher pubLoopConstraintEdge;
 
     ros::Publisher pubSLAMInfo;
+    ros::Publisher pubLocalGPS;
 
     ros::Subscriber subCloud;
     ros::Subscriber subGPS;
@@ -78,7 +83,15 @@ public:
 
     ros::ServiceServer srvSaveMap;
 
-    std::deque<nav_msgs::Odometry> gpsQueue;
+    // Eigen::Affine3f transGPS;
+    // Eigen::Vector3d transLLA;
+    Eigen::Vector3d originLLA;
+    // bool gpsAvialble = false;
+    bool systemInitialized = false;
+    bool gpsTransfromInit = false;
+    GeographicLib::LocalCartesian geo_converter;
+    // std::deque<nav_msgs::Odometry> gpsQueue;
+    std::deque<sensor_msgs::NavSatFix> gpsQueue;
     rolo::CloudInfoStamp cloudInfo;
 
     vector<pcl::PointCloud<PointType>::Ptr> cornerCloudKeyFrames;   // 所有关键帧的角点集合（降采样）
@@ -129,6 +142,7 @@ public:
 
     std::mutex mtx;
     std::mutex mtxLoopInfo;
+    std::mutex mtxGpsInfo;
 
     bool isDegenerate = false;
     cv::Mat matP;
@@ -165,7 +179,10 @@ public:
         pubPath                     = nh.advertise<nav_msgs::Path>("rolo/mapping/path", 1);  // 全局路径
         // Feature extration传过来的cloud_info
         subCloud = nh.subscribe<rolo::CloudInfoStamp>(odomTopic+"/cloud_info", 1, &backMapping::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
-
+        if(useGPS){
+            pubLocalGPS             = nh.advertise<sensor_msgs::NavSatFix>("rolo/mapping/odometry_gps", 1);  // 全局路径
+            subGPS                  = nh.subscribe<sensor_msgs::NavSatFix>(gpsTopic, 1, &backMapping::gpsHandler, this, ros::TransportHints().tcpNoDelay());
+        }
         // 回环数据
         // subLoop  = nh.subscribe<std_msgs::Float64MultiArray>("lio_loop/loop_closure_detection", 1, &backMapping::loopInfoHandler, this, ros::TransportHints().tcpNoDelay());
 
@@ -310,6 +327,13 @@ public:
         matP = cv::Mat(6, 6, CV_32F, cv::Scalar::all(0));
     }
 
+    void gpsHandler(const sensor_msgs::NavSatFix::ConstPtr &gpsMsg) {
+        if(!systemInitialized && gpsMsg->status.status != gpsMsg->status.STATUS_NO_FIX)
+            mtxGpsInfo.lock();
+            gpsQueue.push_back(*gpsMsg);
+            mtxGpsInfo.unlock();
+    }
+
     //! 激光回调函数，
     void laserCloudInfoHandler(const rolo::CloudInfoStampConstPtr& msgIn){
         // extract time stamp 提取时间戳
@@ -324,6 +348,7 @@ public:
         *laserCloudSurfLast += *laserCloudNormalLast;
 
         std::lock_guard<std::mutex> lock(mtx);
+        auto b_start = std::chrono::system_clock::now();
 
         static double timeLastProcessing = -1;
         // 当时间间隔大于阈值时，才进行后端优化
@@ -333,20 +358,38 @@ public:
             timeLastProcessing = timeLaserInfoCur;
             // 根据前端匹配结果，得到当前时刻的先验位姿估计
             updateInitialGuess();
-            // 提取周围的关键帧，并提取其角点和平面点
-            extractSurroundingKeyFrames();
-            // 对当前帧的平面点和角点进行降采样
-            downsampleCurrentScan();
-            // 对周围关键帧寻找有效的点线约束和点面约束，构建非线性问题，优化位姿，并于imu数据融合
-            scan2MapOptimization();
-            // 添加因子，全局优化，保存最优状态估计及其对应的特征点
-            saveKeyFramesAndFactor();
-            // 发生回环后，对历史上所有状态进行重新赋值
-            correctPoses();
-            // 发布全局位姿odom和变换关系的odom(incremental),同时发布全局TF
-            publishOdometry();
-            // 发布相关的点云话题
-            publishFrames();
+
+            if (systemInitialized) {
+                // 提取周围的关键帧，并提取其角点和平面点
+                extractSurroundingKeyFrames();
+                // 对当前帧的平面点和角点进行降采样
+                downsampleCurrentScan();
+                // 对周围关键帧寻找有效的点线约束和点面约束，构建非线性问题，优化位姿，并于imu数据融合
+                scan2MapOptimization();
+                // 添加因子，全局优化，保存最优状态估计及其对应的特征点
+                saveKeyFramesAndFactor();
+                // 发生回环后，对历史上所有状态进行重新赋值
+                correctPoses();
+                // 发布全局位姿odom和变换关系的odom(incremental),同时发布全局TF
+                publishOdometry();
+                // 发布相关的点云话题
+                publishFrames();
+
+                // 保存后端处理时间
+                auto b_end = std::chrono::system_clock::now();
+                std::chrono::duration<double> r_elapsed_seconds = b_end - b_start;
+                // 保存前段时间消耗
+                // 得到全局地图点数
+                size_t global_map_size = 0;
+                for (int i = 0; i < (int)cloudKeyPoses3D->size(); ++i){
+                    global_map_size += cornerCloudKeyFrames[cloudKeyPoses3D->points[i].intensity]->size();
+                    global_map_size += surfCloudKeyFrames[cloudKeyPoses3D->points[i].intensity]->size();
+                }
+
+                back_tum_file << setprecision(19) << timeLaserInfoCur << " " 
+                    << r_elapsed_seconds.count() * 1000 << " "
+                    << global_map_size << std::endl;
+            }
         }
     }
 
@@ -361,11 +404,55 @@ public:
         // 初始化过程
         if (cloudKeyPoses3D->points.empty())
         {
-            // 来自前端Odometry数据的估计姿态
-            transformTobeMapped[0] = 0.0;
-            transformTobeMapped[1] = 0.0;
-            transformTobeMapped[2] = 0.0;
-            return;
+            systemInitialized = false;
+            if(useGPS){
+                ROS_INFO("GPS use to init pose");
+                /** when you align gnss and lidar timestamp, make sure (1.0/gpsFrequence) is small encougn
+                 *  no need to care about the real gnss frquency. time alignment fail will cause
+                 *  "[ERROR] [1689196991.604771416]: sysyem need to be initialized"
+                 * */
+                sensor_msgs::NavSatFix alignedGPS;
+                if(gpsQueue.empty()){
+                    return;
+                }
+                // alignedGPS = gpsQueue.front();
+                if (syncGPS(gpsQueue, alignedGPS, timeLaserInfoCur, 1.0 / gpsPublishFreq)) {
+                    /** we store the origin wgs84 coordinate points in covariance[1]-[3] */
+                    originLLA.setIdentity();
+                    originLLA = Eigen::Vector3d(alignedGPS.latitude,
+                                                alignedGPS.longitude,
+                                                alignedGPS.altitude);
+                    /** set your map origin points */
+                    geo_converter.Reset(originLLA[0], originLLA[1], originLLA[2]);
+                    // WGS84->ENU, must be (0,0,0)
+                    // std::cout << "GPS Position: " << enu.transpose() << std::endl;
+                    std::cout << "GPS LLA: " << originLLA.transpose() << std::endl;
+
+                    systemInitialized = true;
+                    ROS_WARN("GPS init success");
+                }
+                // 来自前端Odometry数据的估计姿态
+                transformTobeMapped[3] = initPose[0];
+                transformTobeMapped[4] = initPose[1];
+                transformTobeMapped[5] = initPose[2];
+
+                transformTobeMapped[0] = initPose[3];
+                transformTobeMapped[1] = initPose[4];
+                transformTobeMapped[2] = initPose[5];
+                return;
+            }
+            else{
+                // 来自前端Odometry数据的估计姿态
+                transformTobeMapped[3] = initPose[0];
+                transformTobeMapped[4] = initPose[1];
+                transformTobeMapped[5] = initPose[2];
+
+                transformTobeMapped[0] = initPose[3];
+                transformTobeMapped[1] = initPose[4];
+                transformTobeMapped[2] = initPose[5];
+                systemInitialized = true;
+                return;
+            }
         }
 
         // use LiDAR odometry estimation for pose guess
@@ -390,6 +477,37 @@ public:
                 return;
             }
         }
+    }
+
+    bool syncGPS(std::deque<sensor_msgs::NavSatFix> &gpsBuf,
+                 sensor_msgs::NavSatFix &aligedGps, double timestamp,
+                 double eps_cam) {
+        bool hasGPS = false;
+        while (!gpsQueue.empty()) {
+            mtxGpsInfo.lock();
+            if (gpsQueue.front().header.stamp.toSec() < timestamp - eps_cam) {
+                // message too old
+                gpsQueue.pop_front();
+                mtxGpsInfo.unlock();
+            } else if (gpsQueue.front().header.stamp.toSec() > timestamp + eps_cam) {
+                // message too new
+                mtxGpsInfo.unlock();
+                break;
+            } else {
+                hasGPS = true;
+                aligedGps = gpsQueue.front();
+                gpsQueue.pop_front();
+//                if (debugGps)
+//                    ROS_INFO("GPS time offset %f ",
+//                             aligedGps.header.stamp.toSec() - timestamp);
+                mtxGpsInfo.unlock();
+            }
+        }
+
+        if (hasGPS)
+            return true;
+        else
+            return false;
     }
 
     //! 提取周围的关键帧，同时提取其角点和平面点
@@ -1168,6 +1286,28 @@ public:
                 laserOdomIncremental.pose.covariance[0] = 0;
         }
         pubLaserOdometryIncremental.publish(laserOdomIncremental);
+
+        if(useGPS){
+            /** we transform the  ENU point to LLA point for visualization with rviz_satellite*/
+            Eigen::Vector3d curr_point(cloudKeyPoses6D->back().x,
+                                        cloudKeyPoses6D->back().y,
+                                        cloudKeyPoses6D->back().z);
+            Eigen::Vector3d curr_lla;
+            // ENU->LLA
+            geo_converter.Reverse(curr_point[0], curr_point[1], curr_point[2], curr_lla[0], curr_lla[1],
+                                    curr_lla[2]);
+            //                std::cout << std::setprecision(9)
+            //                          << "CURR LLA: " << originLLA.transpose() << std::endl;
+            //                std::cout << std::setprecision(9)
+            //                          << "update LLA: " << curr_lla.transpose() << std::endl;
+            sensor_msgs::NavSatFix fix_msgs;
+            fix_msgs.header.stamp = ros::Time().fromSec(timeLaserInfoCur);
+            fix_msgs.header.frame_id = odometryFrame;
+            fix_msgs.latitude = curr_lla[0];
+            fix_msgs.longitude = curr_lla[1];
+            fix_msgs.altitude = curr_lla[2];
+            pubLocalGPS.publish(fix_msgs);
+        }
     }
 
     //! 发布相关的点云话题
@@ -1619,7 +1759,13 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "rolo");
     // 实例化后端优化类
     backMapping BM;
-
+    back_tum_file.clear();
+    if(!BM.loopClosureEnableFlag){
+        back_tum_file.open("/home/sdu/slam_time/rolo/rolo_back.tum");
+    }
+    else{
+        back_tum_file.open("/home/sdu/slam_time/rolo_lc/rolo_lc_back.tum");
+    }
     ROS_INFO("\033[1;32m----> Map Optimization Started.\033[0m");
     
     std::thread loopthread(&backMapping::loopClosureThread, &BM);
@@ -1629,6 +1775,7 @@ int main(int argc, char** argv)
 
     loopthread.join();
     visualizeMapThread.join();
-    BM.saveTUM();
+    // BM.saveTUM();
+    back_tum_file.close();
     return 0;
 }

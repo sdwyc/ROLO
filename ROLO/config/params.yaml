@@ -3,12 +3,16 @@ rolo:
   # Topics
   pointCloudTopic: "velodyne_points"               # Point cloud data
   odomTopic: "odometry/lidar"                   # Front end LiDAR odometry, same frequency as LiDAR pointcloud
+  gpsTopic: "gps/fix"                           # GPS topic for visualization in satellite
+  useGPS: true                                 # GPS message enable
+  gpsPublishFreq: 10.0                          # GPS topic publish frequency
 
   # Frames
   lidarFrame: "velodyne"
   baselinkFrame: "base_link"
   odometryFrame: "odometry"
   mapFrame: "map"
+  initPose: [0.0, 0.0, 0.0, 0.0, 0.0, 180.0]   # Initialization for first pose, degree form, [x, y, z, roll, pitch, yaw]
   
   # Export settings
   savePCD: false                              # The enable setting for save global keyframes
@@ -16,10 +20,10 @@ rolo:
 
   # Sensor Settings
   sensor: velodyne                            # lidar sensor type, 'velodyne' or 'ouster' or 'livox'
-  N_SCAN: 64                                  # number of lidar channel (i.e., Velodyne/Ouster: 16, 32, 64, 128, Livox Horizon: 6)
+  N_SCAN: 32                                  # number of lidar channel (i.e., Velodyne/Ouster: 16, 32, 64, 128, Livox Horizon: 6)
   Horizon_SCAN: 1800                          # lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048, Livox Horizon: 4000)
-  downsampleRate: 2                           # default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
-  lidarMinRange: 1.0                          # default: 1.0, minimum lidar range to be used
+  downsampleRate: 1                           # default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
+  lidarMinRange: 2.0                          # default: 1.0, minimum lidar range to be used
   lidarMaxRange: 1000.0                       # default: 1000.0, maximum lidar range to be used
   lidarNoiseBound: 0.05                     # lidar noise follows Guassian distribution, this is convariance
   deskewEnabled: false                         # Enable flag for laser deskew
@@ -30,14 +34,14 @@ rolo:
   # angBottom: 15.0
 
   # HDL-32E
-  # angResH: 0.2            # 360.0/float(Horizon_SCAN)
-  # angResV: 1.33           # 41.33/float(N_SCAN-1)
-  # angBottom: 30.67          
+  angResH: 0.2            # 360.0/float(Horizon_SCAN)
+  angResV: 1.33           # 41.33/float(N_SCAN-1)
+  angBottom: 30.67          
 
   # HDL-64E
-  angResH: 0.2
-  angResV: 0.43           # 26.8/float(N_SCAN-1)
-  angBottom: 24.8         
+  # angResH: 0.2
+  # angResV: 0.43           # 26.8/float(N_SCAN-1)
+  # angBottom: 24.8         
 
   # LOAM feature threshold
   edgeThreshold: 1.0
@@ -68,10 +72,10 @@ rolo:
   surroundingKeyframeSearchRadius: 50.0         # meters, within n meters scan-to-map optimization (when loop closure disabled) 关键帧的搜索范围阈值
 
   # Loop closure
-  loopClosureEnableFlag: false
+  loopClosureEnableFlag: true
   loopClosureFrequency: 1.0                     # Hz, regulate loop closure constraint add frequency
   surroundingKeyframeSize: 50                   # submap size (when loop closure enabled)
-  historyKeyframeSearchRadius: 30.0             # meters, key frame that is within n meters from current pose will be considerd for loop closure
+  historyKeyframeSearchRadius: 50.0             # meters, key frame that is within n meters from current pose will be considerd for loop closure
   historyKeyframeSearchTimeDiff: 30.0           # seconds, key frame that is n seconds older will be considered for loop closure
   historyKeyframeSearchNum: 25                  # number of hostory key frames will be fused into a submap for loop closure
   historyKeyframeFitnessScore: 0.3              # icp threshold, the smaller the better alignment
@@ -79,4 +83,4 @@ rolo:
   # VisualizationU
   globalMapVisualizationSearchRadius: 1000.0    # meters, global map visualization radius
   globalMapVisualizationPoseDensity: 10.0       # meters, global map visualization keyframe density
-  globalMapVisualizationLeafSize: 1.0           # meters, global map visualization cloud density
+  globalMapVisualizationLeafSize: 0.4           # meters, global map visualization cloud density

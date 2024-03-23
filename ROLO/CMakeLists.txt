@@ -78,6 +78,8 @@ generate_messages(
   geometry_msgs   nav_msgs   std_msgs   sensor_msgs
 )
 
+add_subdirectory(./ThirdParty/GeographicLib/)
+
 catkin_package(
   INCLUDE_DIRS include
   DEPENDS PCL GTSAM
@@ -101,6 +103,7 @@ include_directories(
 	${PCL_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
 	${GTSAM_INCLUDE_DIR}
+  ./ThirdParty/GeographicLib/include/
 )
 
 link_directories(
@@ -144,7 +147,7 @@ target_link_libraries(${PROJECT_NAME}_lidarOdometry ${catkin_LIBRARIES} ${PCL_LI
 add_executable(${PROJECT_NAME}_backMapping src/backMapping.cpp)
 add_dependencies(${PROJECT_NAME}_backMapping ${PROJECT_NAME}_generate_messages_cpp)
 target_compile_options(${PROJECT_NAME}_backMapping PRIVATE ${OpenMP_CXX_FLAGS})
-target_link_libraries(${PROJECT_NAME}_backMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam)
+target_link_libraries(${PROJECT_NAME}_backMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} libGeographic gtsam)
 
 
 ## Test executable
