@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/yuaqi/3D_slam/rolo/build/pmc-download/CMakeFiles/pmc"
+		},
+		{
+			"file" : "/home/yuaqi/3D_slam/rolo/build/pmc-download/CMakeFiles/pmc.rule"
+		},
+		{
+			"file" : "/home/yuaqi/3D_slam/rolo/build/pmc-download/CMakeFiles/pmc-complete.rule"
+		},
+		{
+			"file" : "/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-install.rule"
+		},
+		{
+			"file" : "/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-mkdir.rule"
+		},
+		{
+			"file" : "/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-download.rule"
+		},
+		{
+			"file" : "/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-update.rule"
+		},
+		{
+			"file" : "/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-patch.rule"
+		},
+		{
+			"file" : "/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-configure.rule"
+		},
+		{
+			"file" : "/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-build.rule"
+		},
+		{
+			"file" : "/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-test.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"pmc"
+		],
+		"name" : "pmc"
+	}
+}

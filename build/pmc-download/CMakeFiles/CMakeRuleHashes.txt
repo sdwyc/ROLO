@@ -1,0 +1,11 @@
+# Hashes of file build rules.
+9aade5afe27ec133bd06d17faace8eee CMakeFiles/pmc
+d076191f7818be13f756473ed0881c69 CMakeFiles/pmc-complete
+bb44d0de421668256975269454953ba0 pmc-prefix/src/pmc-stamp/pmc-build
+bb97bda110b4f0bb47742c43df62a00b pmc-prefix/src/pmc-stamp/pmc-configure
+8f8088cb0a44755be5898886e96bfaa2 pmc-prefix/src/pmc-stamp/pmc-download
+d2f49020d13990025a6541d90db57010 pmc-prefix/src/pmc-stamp/pmc-install
+9d6731aed208b430b0dcbf1dfdbb7f91 pmc-prefix/src/pmc-stamp/pmc-mkdir
+492d442956b7cc75227ee8eb159c6e58 pmc-prefix/src/pmc-stamp/pmc-patch
+411f3b24fa9f695b62108160dfaeace2 pmc-prefix/src/pmc-stamp/pmc-test
+e9a476986a437b058869f8c7ec70130b pmc-prefix/src/pmc-stamp/pmc-update

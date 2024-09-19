@@ -1,0 +1,8 @@
+prefix=/home/yuaqi/3D_slam/rolo/devel
+
+Name: cloud_msgs
+Description: Description of cloud_msgs
+Version: 1.0.0
+Cflags: -I/home/yuaqi/3D_slam/rolo/devel/include
+Libs: -L${prefix}/lib 
+Requires: message_runtime message_generation geometry_msgs std_msgs nav_msgs

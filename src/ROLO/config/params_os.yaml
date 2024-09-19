@@ -1,0 +1,71 @@
+rolo:
+
+  # Topics
+  pointCloudTopic: "ouster/points"               # Point cloud data
+  odomTopic: "odometry/lidar"                   # Front end LiDAR odometry, same frequency as LiDAR pointcloud
+  gpsTopic: "gps/fix"                           # GPS topic for visualization in satellite
+  useGPS: true                                 # GPS message enable
+  gpsPublishFreq: 10.0                          # GPS topic publish frequency
+
+  # Frames
+  lidarFrame: "os_sensor"
+  baselinkFrame: "base_link"
+  odometryFrame: "odometry"
+  mapFrame: "map"
+  initPose: [0.0, 0.0, 0.0, 0.0, 0.0, 180.0]   # Initialization for first pose, degree form, [x, y, z, roll, pitch, yaw]
+
+  # Export settings
+  savePCD: false                              # The enable setting for save global keyframes
+  savePCDDirectory: "/Downloads/LOAM/"        # Save path of map in your home folder, starts and ends with "/".
+
+  # Sensor Settings
+  sensor: velodyne                            # lidar sensor type, 'velodyne' or 'ouster' or 'livox'
+  N_SCAN: 32                                  # number of lidar channel (i.e., Velodyne/Ouster: 16, 32, 64, 128, Livox Horizon: 6)
+  Horizon_SCAN: 1800                          # lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048, Livox Horizon: 4000)
+  downsampleRate: 1                           # default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
+  lidarMinRange: 2.0                          # default: 1.0, minimum lidar range to be used
+  lidarMaxRange: 1000.0                       # default: 1000.0, maximum lidar range to be used
+  lidarNoiseBound: 0.05                     # lidar noise follows Guassian distribution, this is convariance
+  deskewEnabled: false                         # Enable flag for laser deskew
+
+  # LOAM feature threshold
+  edgeThreshold: 0.8
+  surfThreshold: 0.1
+  edgeFeatureMinValidNum: 20
+  surfFeatureMinValidNum: 100
+  
+  # voxel filter paprams
+  odometrySurfLeafSize: 0.4                     # default: 0.4 - outdoor, 0.2 - indoor
+  mappingCornerLeafSize: 0.2                    # default: 0.2 - outdoor, 0.1 - indoor
+  mappingSurfLeafSize: 0.4                      # default: 0.4 - outdoor, 0.2 - indoor
+
+  # robot motion constraint (in case you are using a 2D robot)
+  z_tollerance: 1000                            # meters
+  rotation_tollerance: 1000                     # radians
+
+  # CPU Params
+  numberOfCores: 8                              # number of cores for mapping optimization
+  mappingProcessInterval: 0.15                  # seconds, regulate mapping frequency
+
+  # Scan Reagistration
+  continuousTrajectoryWeight: 0.3
+
+  # Surrounding map
+  surroundingkeyframeAddingDistThreshold: 0.5   # meters, regulate keyframe adding threshold
+  surroundingkeyframeAddingAngleThreshold: 0.2  # radians, regulate keyframe adding threshold
+  surroundingKeyframeDensity: 2.0               # meters, downsample surrounding keyframe poses   
+  surroundingKeyframeSearchRadius: 50.0         # meters, within n meters scan-to-map optimization (when loop closure disabled) 关键帧的搜索范围阈值
+
+  # Loop closure
+  loopClosureEnableFlag: true
+  loopClosureFrequency: 1.0                     # Hz, regulate loop closure constraint add frequency
+  surroundingKeyframeSize: 50                   # submap size (when loop closure enabled)
+  historyKeyframeSearchRadius: 30.0             # meters, key frame that is within n meters from current pose will be considerd for loop closure
+  historyKeyframeSearchTimeDiff: 30.0           # seconds, key frame that is n seconds older will be considered for loop closure
+  historyKeyframeSearchNum: 25                  # number of hostory key frames will be fused into a submap for loop closure
+  historyKeyframeFitnessScore: 0.3              # icp threshold, the smaller the better alignment
+
+  # VisualizationU
+  globalMapVisualizationSearchRadius: 1000.0    # meters, global map visualization radius
+  globalMapVisualizationPoseDensity: 10.0       # meters, global map visualization keyframe density
+  globalMapVisualizationLeafSize: 1.0           # meters, global map visualization cloud density

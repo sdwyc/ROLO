@@ -1,0 +1,2 @@
+ROLO:cloud_msgs:rviz_satellite
+-DCATKIN_DEVEL_PREFIX=/home/yuaqi/3D_slam/rolo/devel -DCMAKE_INSTALL_PREFIX=/home/yuaqi/3D_slam/rolo/install -G Unix Makefiles

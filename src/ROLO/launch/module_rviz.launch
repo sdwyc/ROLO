@@ -1,0 +1,9 @@
+<launch>
+
+    <arg name="project" default="rolo"/>
+
+    <!--- Run Rviz-->
+    <node pkg="rviz" type="rviz" name="$(arg project)_rviz" args="-d $(find rolo)/config/rviz/rolo.rviz" />
+    <!-- <node pkg="rviz" type="rviz" name="$(arg project)_rviz_global" args="-d $(find rolo)/config/rviz/rolo_global.rviz" /> -->
+
+</launch>

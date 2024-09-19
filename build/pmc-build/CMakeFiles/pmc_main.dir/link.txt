@@ -1,0 +1,1 @@
+/usr/bin/c++  -O3 -Wall -g  -fopenmp -O3 -DNDEBUG    CMakeFiles/pmc_main.dir/pmc_driver.cpp.o  -o pmc_main -Wl,-rpath,/home/yuaqi/3D_slam/rolo/devel/lib /home/yuaqi/3D_slam/rolo/devel/lib/libpmc.so /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.so -lpthread 

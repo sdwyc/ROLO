@@ -1,0 +1,26 @@
+<launch>
+    <param name="use_sim_time" value="true" />
+    <arg name="project" default="rolo"/>
+    
+    <!-- Parameters -->
+    <rosparam file="$(find rolo)/config/params.yaml" command="load" />
+    <node pkg="tf" type="static_transform_publisher" name="velodyne2base" args="0 0 0 0 0 0 /base_link /velodyne 10" />
+    
+    <!-- <rosparam file="$(find rolo)/config/params_os.yaml" command="load" />
+    <node pkg="tf" type="static_transform_publisher" name="base2ouster" args="0 0 0 0 0 0 /base_link /os_sensor 10" /> -->
+
+    <!--- LOAM -->
+    <include file="$(find rolo)/launch/module_loam.launch" />
+
+
+    <!--set your orgin gps lla  22.3387279108228 114.263622199692 87.7310562180355 -->
+    <node pkg="rostopic" type="rostopic" name="fake_gps_fix"
+          args="pub /fix sensor_msgs/NavSatFix '{ header: {frame_id: 'gps_link', stamp: now}, latitude: 36.605050, longitude: 117.060225, altitude:  258.913}' --rate 10"
+          output="screen"/>
+    <!--- Robot State TF -->
+    <!-- <include file="$(find rolo)/launch/include/module_robot_state_publisher.launch" /> -->
+
+    <!--- Run Rviz-->
+    <include file="$(find rolo)/launch/module_rviz.launch" />
+
+</launch>

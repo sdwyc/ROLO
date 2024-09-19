@@ -1,0 +1,7 @@
+-DROS_BUILD_SHARED_LIBS=1
+-DROS_BUILD_SHARED_LIBS=1
+-DROS_PACKAGE_NAME="rviz_satellite"
+-DROSCONSOLE_BACKEND_LOG4CXX
+-o
+/home/yuaqi/3D_slam/rolo/build/rviz_satellite/src/moc_tileloader.cpp
+/home/yuaqi/3D_slam/rolo/src/rviz_satellite/src/tileloader.h

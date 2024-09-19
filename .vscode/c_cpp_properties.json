@@ -1,0 +1,56 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${workspaceFolder}/.vscode/browse.vc.db",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/yuaqi/3D_slam/rolo/devel/include/**",
+        "/home/yuaqi/stone_ws/devel/include/**",
+        "/home/yuaqi/catkin_ws/devel/include/**",
+        "/opt/ros/melodic/include/**",
+        "/home/yuaqi/stone_ws/src/api_gateway/include/**",
+        "/home/yuaqi/stone_ws/src/area_costmap_2d/include/**",
+        "/home/yuaqi/stone_ws/src/area_global_planner/include/**",
+        "/home/yuaqi/stone_ws/src/area_trajectory_generator/include/**",
+        "/home/yuaqi/stone_ws/src/auto_mapping/include/**",
+        "/home/yuaqi/stone_ws/src/base_local_planner/include/**",
+        "/home/yuaqi/stone_ws/src/calibration/include/**",
+        "/home/yuaqi/stone_ws/src/chassis/include/**",
+        "/home/yuaqi/stone_ws/src/clear_costmap_recovery/include/**",
+        "/home/yuaqi/stone_ws/src/com/include/**",
+        "/home/yuaqi/stone_ws/src/costmap_2d/include/**",
+        "/home/yuaqi/stone_ws/src/data_base/include/**",
+        "/home/yuaqi/stone_ws/src/dwa_local_planner/include/**",
+        "/home/yuaqi/stone_ws/src/fixed_global_planner/include/**",
+        "/home/yuaqi/stone_ws/src/global_planner/include/**",
+        "/home/yuaqi/stone_ws/src/img_http/include/**",
+        "/home/yuaqi/stone_ws/src/lidar_pipeline/include/**",
+        "/home/yuaqi/stone_ws/src/map_provider/include/**",
+        "/home/yuaqi/stone_ws/src/map_server/include/**",
+        "/home/yuaqi/stone_ws/src/move_base/include/**",
+        "/home/yuaqi/stone_ws/src/move_slow_and_clear/include/**",
+        "/home/yuaqi/stone_ws/src/moving_strategy/include/**",
+        "/home/yuaqi/stone_ws/src/nav_core/include/**",
+        "/home/yuaqi/stone_ws/src/navfn/include/**",
+        "/home/yuaqi/stone_ws/src/navigation_layers/range_sensor_layer/include/**",
+        "/home/yuaqi/3D_slam/rolo/src/ROLO/include/**",
+        "/home/yuaqi/stone_ws/src/rotate_recovery/include/**",
+        "/home/yuaqi/stone_ws/src/sick_scan/include/**",
+        "/home/yuaqi/stone_ws/src/teb_local_planner/include/**",
+        "/home/yuaqi/stone_ws/src/tic_amcl/include/**",
+        "/home/yuaqi/stone_ws/src/trajectory_recorder/include/**",
+        "/home/yuaqi/stone_ws/src/voxel_grid/include/**",
+        "/home/yuaqi/stone_ws/src/yocs_velocity_smoother/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

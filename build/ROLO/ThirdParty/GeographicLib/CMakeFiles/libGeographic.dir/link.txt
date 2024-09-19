@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -O3 -Wall -g  -fopenmp -O3 -DNDEBUG   -shared -Wl,-soname,liblibGeographic.so -o /home/yuaqi/3D_slam/rolo/devel/lib/liblibGeographic.so CMakeFiles/libGeographic.dir/src/LocalCartesian.cpp.o CMakeFiles/libGeographic.dir/src/Geocentric.cpp.o CMakeFiles/libGeographic.dir/src/Math.cpp.o 

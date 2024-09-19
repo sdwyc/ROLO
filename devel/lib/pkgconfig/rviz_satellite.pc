@@ -1,0 +1,8 @@
+prefix=/home/yuaqi/3D_slam/rolo/devel
+
+Name: rviz_satellite
+Description: Description of rviz_satellite
+Version: 1.1.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: nav_msgs sensor_msgs

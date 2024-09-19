@@ -1,0 +1,13 @@
+<launch>
+    <param name="use_sim_time" value="true" />
+
+    <arg name="project" default="rolo"/>
+    
+    <node pkg="$(arg project)" type="$(arg project)_lidarOdometry"     name="$(arg project)_lidarOdometry"      output="screen"     respawn="true"/>
+    <node pkg="$(arg project)" type="$(arg project)_imageProjection"     name="$(arg project)_imageProjection"      output="screen"     respawn="true"/>
+    <node pkg="$(arg project)" type="$(arg project)_featureExtraction"     name="$(arg project)_featureExtraction"      output="screen"     respawn="true"/>
+    <node pkg="$(arg project)" type="$(arg project)_backMapping"     name="$(arg project)_backMapping"      output="screen"     respawn="true"/>
+    <node pkg="$(arg project)" type="slopeEstimation"     name="slopeEstimation"      output="screen"     respawn="true"/>
+
+    
+</launch>

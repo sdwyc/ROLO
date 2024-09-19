@@ -1,0 +1,14 @@
+# Target labels
+ pmc
+# Source files and their labels
+/home/yuaqi/3D_slam/rolo/build/pmc-download/CMakeFiles/pmc
+/home/yuaqi/3D_slam/rolo/build/pmc-download/CMakeFiles/pmc.rule
+/home/yuaqi/3D_slam/rolo/build/pmc-download/CMakeFiles/pmc-complete.rule
+/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-install.rule
+/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-mkdir.rule
+/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-download.rule
+/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-update.rule
+/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-patch.rule
+/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-configure.rule
+/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-build.rule
+/home/yuaqi/3D_slam/rolo/build/pmc-download/pmc-prefix/src/pmc-stamp/pmc-test.rule
