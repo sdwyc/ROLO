@@ -3,11 +3,12 @@
 =
 [[IEEE JFR]()][[ArXiv]()][[Video]()]
 
-LiDAR-based SLAM is recognized as one effective method to offer localization guidance in rough environments. However, off-and-shelf LiDAR-based SLAM methods suffer from significant pose estimation drifts, particularly components relevant to the vertical direction, when passing to uneven terrains. This deficiency typically leads to a conspicuously distorted global map. In this article, a LiDAR-based SLAM method is presented to improve the accuracy of pose estimations for ground vehicles in rough terrains, which is termed Rotation-Optimized LiDAR-Only (ROLO) SLAM. The method exploits a forward location prediction to coarsely eliminate the location difference of consecutive scans, thereby enabling separate and accurate determination of the location and orientation at the front-end. Furthermore, we adopt a parallel-capable spatial voxelization for correspondence-matching. We develop a spherical alignment-guided rotation registration within each voxel to estimate the rotation of vehicle. By incorporating geometric alignment, we introduce the motion constraint into the optimization formulation to enhance the rapid and effective estimation of LiDAR's translation. Subsequently, we extract several keyframes to construct the submap and exploit an alignment from the current scan to the submap for precise pose estimation. Meanwhile, a global-scale factor graph is established to aid in the reduction of cumulative errors. In various scenes, diverse experiments have been conducted to evaluate our method. The results demonstrate that ROLO-SLAM excels in pose estimation of ground vehicles and outperforms existing state-of-the-art LiDAR SLAM frameworks.
+ROLO-SLAM is a lightweight and robust LiDAR-based SLAM solution designed to improve the accuracy of pose estimation for ground vehicles in rough terrains. It incorporates several algorithmic innovations that reduce pose estimation drifts, particularly in the vertical direction, which are commonly observed when navigating uneven terrains. The method includes forward location prediction to coarsely eliminate the location differences between consecutive scans, enabling separate and accurate localization and orientation determination. Additionally, ROLO-SLAM features a parallel-capable spatial voxelization for correspondence matching, along with a spherical alignment-guided rotation registration to estimate vehicle rotation. By incorporating motion constraints into the optimization process, the algorithm enhances the rapid and effective estimation of LiDAR translation. Extensive experiments conducted across diverse environments demonstrate that ROLO-SLAM consistently achieves accurate pose estimation and outperforms existing state-of-the-art LiDAR SLAM solutions, making it a reliable choice for ground vehicle localization in perceptually-challenging environments.
 
 ## Instructions
 
-
+ROLO requires an input point cloud of type `sensor_msgs::PointCloud2` . 
+ROLO-SLAM mitigates vertical pose drift by dividing the front-end into three modules: forward location prediction for coarse translation estimation, voxelization matching for precise rotation estimation, and continuous-time translation estimation for improved accuracy. The back-end integrates scan-to-submap alignment and global factor graph optimization to enhance overall localization performance in challenging terrains.
 
 ## Dependencies
 
@@ -56,4 +57,3 @@ rosbag play your-bag.bag -r 1
 
 
 ## License
-
