@@ -76,6 +76,7 @@ This work is licensed under the terms of the MIT license.
 <div align="center">
     <img src="https://github.com/sdwyc/ROLO/blob/main/doc/gif/comparison_3-ezgif.com-video-to-gif-converter.gif" alt="GIF Description" width="500" />
 </div>
+
 <div align="center">
     <img src="https://github.com/sdwyc/ROLO/blob/main/doc/gif/first_view-ezgif.com-video-to-gif-converter.gif" alt="GIF Description" width="500" />
 </div>
