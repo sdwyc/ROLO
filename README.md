@@ -7,7 +7,7 @@ ROLO-SLAM is a lightweight and robust LiDAR-based SLAM solution designed to impr
 
 ROLO requires an input point cloud of type `sensor_msgs::PointCloud2` . 
 ROLO-SLAM mitigates vertical pose drift by dividing the front-end into three modules: forward location prediction for coarse translation estimation, voxelization matching for precise rotation estimation, and continuous-time translation estimation for improved accuracy. The back-end integrates scan-to-submap alignment and global factor graph optimization to enhance overall localization performance in challenging terrains.
-![实验平台](/doc/img/platform.pdf "Platform")
+![实验平台](/doc/img/platform_00.png "Platform")
 ## Dependencies
 
 Our system has been tested extensively on both Ubuntu 18.04 with ROS Melodic and Ubuntu 20.04 with ROS Noetic, although other versions may work. The following configuration with required dependencies has been verified to be compatible:
