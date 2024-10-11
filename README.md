@@ -6,6 +6,7 @@ ROLO-SLAM is a lightweight and robust LiDAR-based SLAM solution designed to impr
 <div align="center">
     <img src="https://github.com/sdwyc/ROLO/blob/main/doc/gif/4scenes-ezgif.com-video-to-gif-converter.gif" alt="GIF Description" width="500" />
 </div>
+
 ## Instructions
 
 ROLO requires an input point cloud of type `sensor_msgs::PointCloud2` . 
