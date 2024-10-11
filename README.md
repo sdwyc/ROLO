@@ -13,7 +13,7 @@ ROLO requires an input point cloud of type `sensor_msgs::PointCloud2` .
 ROLO-SLAM mitigates vertical pose drift by dividing the front-end into three modules: forward location prediction for coarse translation estimation, voxelization matching for precise rotation estimation, and continuous-time translation estimation for improved accuracy. The back-end integrates scan-to-submap alignment and global factor graph optimization to enhance overall localization performance in challenging terrains.
 
 <div align="center">
-    <img src="https://github.com/sdwyc/ROLO/blob/main/doc/img/platform_00.png" alt="Example Image" width="300" />
+    <img src="https://github.com/sdwyc/ROLO/blob/main/doc/img/platform_00.png" alt="Example Image" width="600" />
 </div>
 
 ## Dependencies
