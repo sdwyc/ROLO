@@ -2,7 +2,8 @@
  Rotation-Optimized LiDAR-Only SLAM in Uneven Terrain with Ground Vehicle
 =
 ROLO-SLAM is a lightweight and robust LiDAR-based SLAM solution designed to improve the accuracy of pose estimation for ground vehicles in rough terrains. It incorporates several algorithmic innovations that reduce pose estimation drifts, particularly in the vertical direction, which are commonly observed when navigating uneven terrains. The method includes forward location prediction to coarsely eliminate the location differences between consecutive scans, enabling separate and accurate localization and orientation determination. Additionally, ROLO-SLAM features a parallel-capable spatial voxelization for correspondence matching, along with a spherical alignment-guided rotation registration to estimate vehicle rotation. By incorporating motion constraints into the optimization process, the algorithm enhances the rapid and effective estimation of LiDAR translation. Extensive experiments conducted across diverse environments demonstrate that ROLO-SLAM consistently achieves accurate pose estimation and outperforms existing state-of-the-art LiDAR SLAM solutions, making it a reliable choice for ground vehicle localization in perceptually-challenging environments.
-
+![俯视图](/doc/gif/4scenes-ezgif.com-video-to-gif-converter.gif
+ "scenes")
 ## Instructions
 
 ROLO requires an input point cloud of type `sensor_msgs::PointCloud2` . 
