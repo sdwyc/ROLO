@@ -15,10 +15,6 @@ ROLO-SLAM mitigates vertical pose drift by dividing the front-end into three mod
 <div align="center">
     <img src="https://github.com/sdwyc/ROLO/blob/main/doc/img/platform_00.png" alt="Example Image" width="600" />
 </div>
-<div align="center">
-		 <img src="https://github.com/sdwyc/ROLO/blob/main/doc/img/off3_mapping_00.png" alt="Example Image" width="750" />
-		 <img src="https://github.com/sdwyc/ROLO/blob/main/doc/img/title_graph_00.png" alt="Example Image" width="500" />
-</div>
 
 ## Dependencies
 
@@ -59,6 +55,9 @@ rosbag play your-bag.bag -r 1
 
 ## Test Data
 
+<div align="center">
+		 <img src="https://github.com/sdwyc/ROLO/blob/main/doc/img/off3_mapping_00.png" alt="Example Image" width="750" />
+</div>
 
 ## Citation
 
