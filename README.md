@@ -22,13 +22,13 @@ Our system has been tested extensively on both Ubuntu 18.04 with ROS Melodic and
 -   Ubuntu 18.04 or 20.04
 -   ROS Melodic or Noetic (`nav_msgs`, `cv_bridge`, `rospy`, `roscpp`,  `std_msgs`,  `sensor_msgs`,  `geometry_msgs`,  `pcl_ros`, `tf`, `visualization_msgs`, `message_generation`)
 -   C++ 14
--   CMake >=  `3.0.2`
--   OpenCV
--   GTSAM
--   Boost
--   OpenMP 
--   Point Cloud Library 
--   Eigen 
+-   CMake >= `3.0.2`
+-   OpenCV >= `4.10.0`
+-   GTSAM >= `4.2.0`
+-   Boost >= `1.71`
+-   GCC >= `8.4.0` 
+-   Point Cloud Library >= `1.10.0`
+-   Eigen >= `3.3.7`
 ## Compiling
 
 Create a catkin workspace, clone the `ROLO` repository into the `src` folder, and compile via the [`catkin_make`](http://wiki.ros.org/catkin/commands/catkin_make) package :
