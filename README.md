@@ -57,11 +57,12 @@ rosbag play your-bag.bag -r 1
 ## Citation
 Our work will be published in JOURNAL OF FILLD ROBOTICS, if you found this work useful, please cite our manuscript:
 ```bibtex
-@article{wang2024rolo,
-  author={Wang, Yinchuan and Ren, Bin and Zhang, Xiang and Wang, Pengyu and Wang, Chaoqun and Song, Rui and Li, Yibin and Meng, Max Q.-H.},
-  journal={JOURNAL OF FIELD ROBOTICS},
-  title={ROLO-SLAM: Rotation-Optimized LiDAR-Only SLAM in Uneven Terrain with Ground Vehicle},
-  year={2024},
+@article{wang2025rolo,
+  title={ROLO-SLAM: Rotation-Optimized LiDAR-Only SLAM in Uneven Terrain With Ground Vehicle},
+  author={Wang, Yinchuan and Ren, Bin and Zhang, Xiang and Wang, Pengyu and Wang, Chaoqun and Song, Rui and Li, Yibin and Meng, Max Q-H},
+  journal={Journal of Field Robotics},
+  year={2025},
+  publisher={Wiley Online Library}
 }
 ```
 
