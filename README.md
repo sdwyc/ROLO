@@ -34,7 +34,7 @@ Our system has been tested extensively on both Ubuntu 18.04 with ROS Melodic and
 Create a catkin workspace, clone the `ROLO` repository into the `src` folder, and compile via the [`catkin_make`](http://wiki.ros.org/catkin/commands/catkin_make) package :
 ```bash
 mkdir rolo_ws && cd rolo_ws && mkdir src && cd src
-git clone https://github.com/vectr-ucla/direct_lidar_odometry.git
+git clone https://github.com/sdwyc/ROLO.git
 cd ..
 catkin_make
 ```
