@@ -41,7 +41,7 @@ catkin_make
 
 
 ## Test Data
-For your convenience, we provide example test data [here]([https://ucla.box.com/shared/static/ziojd3auzp0zzcgwb1ucau9anh69xwv9.bag](https://drive.google.com/file/d/1Xv8KFIYnK_ETduEiaSFqfBQGXi_yWvf8/view?usp=drive_link)) (7 minutes, ~8.9GB). To run, first launch ROLO via:
+For your convenience, we provide example test data [here](https://drive.google.com/file/d/1Xv8KFIYnK_ETduEiaSFqfBQGXi_yWvf8/view?usp=drive_link) (7 minutes, ~8.9GB). To run, first launch ROLO via:
 ```
 roslaunch rolo rolo_run.launch
 ```
@@ -55,7 +55,7 @@ rosbag play your-bag.bag -r 1
 </div>
 
 ## Citation
-Our work will be published in JOURNAL OF FILLD ROBOTICS, if you found this work useful, please cite our manuscript:
+Our work will be published in Journal of Field Robotics, if you found this work useful, please cite our manuscript:
 ```bibtex
 @article{wang2025rolo,
   title={ROLO-SLAM: Rotation-Optimized LiDAR-Only SLAM in Uneven Terrain With Ground Vehicle},
