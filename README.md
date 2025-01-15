@@ -41,7 +41,7 @@ catkin_make
 
 
 ## Test Data
-For your convenience, we provide example test data [here](https://ucla.box.com/shared/static/ziojd3auzp0zzcgwb1ucau9anh69xwv9.bag) (9 minutes, ~4.2GB). To run, first launch ROLO via:
+For your convenience, we provide example test data [here]([https://ucla.box.com/shared/static/ziojd3auzp0zzcgwb1ucau9anh69xwv9.bag](https://drive.google.com/file/d/1Xv8KFIYnK_ETduEiaSFqfBQGXi_yWvf8/view?usp=drive_link)) (7 minutes, ~8.9GB). To run, first launch ROLO via:
 ```
 roslaunch rolo rolo_run.launch
 ```
