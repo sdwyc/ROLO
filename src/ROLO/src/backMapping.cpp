@@ -2126,7 +2126,7 @@ public:
     void saveTUM(){
         ofstream tum_file;
         string pkg_path = ros::package::getPath("rolo");
-        tum_file.open(pkg_path + "/data/rolo_temp.tum");
+        tum_file.open(pkg_path + "/data/ccc/rolo_temp.tum");
         tum_file.clear();
         for (int i=0 ; i<cloudKeyPoses6D->size(); i++){
             geometry_msgs::Quaternion q = tf::createQuaternionMsgFromRollPitchYaw(cloudKeyPoses6D->points[i].roll, 
@@ -2169,7 +2169,7 @@ int main(int argc, char** argv)
     loopthread.join();
     visualizeMapThread.join();
     slopethread.join();
-    // BM.saveTUM();
+     BM.saveTUM();
     back_tum_file.close();
     return 0;
 }

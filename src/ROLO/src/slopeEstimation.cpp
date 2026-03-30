@@ -10,7 +10,7 @@
 #include <visualization_msgs/MarkerArray.h>
 #include "cloud_msgs/slope.h"
 #define PCL_NO_PRECOMPILE
-#include <opencv/cv.h>
+#include <opencv2/opencv.hpp>
 #include <pcl/pcl_base.h>
 #include <pcl/point_cloud.h>
 
@@ -31,12 +31,12 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
+#include <pcl/sample_consensus/sac.h>
+#include <pcl/sample_consensus/sac_model.h>
+#include <pcl/sample_consensus/ransac.h>
+#include <pcl/registration/icp.h>
+#include <pcl/surface/mls.h>
 
-#include <pcl-1.8/pcl/sample_consensus/sac.h>
-#include <pcl-1.8/pcl/sample_consensus/sac_model.h>
-#include <pcl-1.8/pcl/sample_consensus/ransac.h>
-#include <pcl-1.8/pcl/registration/icp.h>
-#include <pcl-1.8/pcl/surface/mls.h>
 #include <Eigen/Dense>
 #include <visualization_msgs/Marker.h>
 
