@@ -224,13 +224,15 @@ public:
         timeScanCur = cloudHeader.stamp.toSec(); // 当前帧第一个点扫描的时间
         // 扫描完最后一个点的时间
         timeScanEnd = timeScanCur + laserCloudIn->points.back().time;
-
+        std::vector<int> indices;
+        pcl::removeNaNFromPointCloud(*laserCloudIn, *laserCloudIn, indices);
+        laserCloudIn->is_dense = true;
         // check dense flag 检查点云有效性
-        if (laserCloudIn->is_dense == false)
-        {
-            ROS_ERROR("Point cloud is not in dense format, please remove NaN points first!");
-            ros::shutdown();
-        }
+       // if (laserCloudIn->is_dense == false)
+        //{
+        //    ROS_ERROR("Point cloud is not in dense format, please remove NaN points first!");
+         //   ros::shutdown();
+       // }
         // check ring channel
         if (ringFlag == 0)
         {
