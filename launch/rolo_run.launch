@@ -13,6 +13,9 @@
     <!--- LOAM -->
     <include file="$(find rolo)/launch/module_loam.launch" />
 
+    <!-- Prior Prediction -->
+    <include file="$(find rolo)/launch/module_prior.launch" />
+
     <!--- Robot State TF -->
     <!-- <include file="$(find rolo)/launch/include/module_robot_state_publisher.launch" /> -->
 

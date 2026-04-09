@@ -14,12 +14,17 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   cv_bridge
   pcl_ros
+  pcl_conversions
   roscpp
   rospy
   std_msgs
   sensor_msgs
   tf
   visualization_msgs
+  tf2
+  tf2_ros
+  tf2_eigen
+  tf2_geometry_msgs
   message_generation
 )
 
@@ -95,6 +100,10 @@ catkin_install_python(PROGRAMS test/translation_plot.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
+catkin_install_python(PROGRAMS test/dual_odom_delta_state_filter_future_split.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
 include_directories(
 	include
 	${catkin_INCLUDE_DIRS}
@@ -146,6 +155,17 @@ add_dependencies(${PROJECT_NAME}_backMapping ${PROJECT_NAME}_generate_messages_c
 target_compile_options(${PROJECT_NAME}_backMapping PRIVATE ${OpenMP_CXX_FLAGS})
 target_link_libraries(${PROJECT_NAME}_backMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam)
 
+add_executable(ground_factor_node
+  src/prior_pose/pose_solver.cpp
+  src/prior_pose/ground_factor_node.cpp
+)
+add_dependencies(ground_factor_node ${PROJECT_NAME}_generate_messages_cpp)
+target_compile_options(ground_factor_node PRIVATE ${OpenMP_CXX_FLAGS})
+target_link_libraries(ground_factor_node
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam
+)
 
 ## Test executable
 add_executable(rotation_test test/rotation_test.cpp)
