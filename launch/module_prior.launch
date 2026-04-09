@@ -1,0 +1,15 @@
+<launch>
+    <param name="use_sim_time" value="true" />
+    <arg name="project" default="rolo"/>
+
+    <arg name="param_file" default="$(find rolo)/config/prior_pose_params.yaml" />
+    <arg name="pcd_topic" default="/voxel_map" />
+
+    <include file="$(find point_seg)/launch/ground_mapping.launch" />
+
+    <rosparam command="load" file="$(arg param_file)" />
+    <node pkg="rolo" type="ground_factor_node" name="ground_factor_node" output="screen" >
+        <param name="pcd_topic" value="$(arg pcd_topic)"/>
+    </node>
+
+</launch>
