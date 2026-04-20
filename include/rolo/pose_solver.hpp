@@ -1,6 +1,6 @@
 #pragma once
-#ifndef _UTILITY_LIDAR_ODOMETRY_H_
-#define _UTILITY_LIDAR_ODOMETRY_H_
+#ifndef ROLO_POSE_SOLVER_HPP_
+#define ROLO_POSE_SOLVER_HPP_
 #define PCL_NO_PRECOMPILE
 
 #include <sensor_msgs/PointCloud2.h>
@@ -18,6 +18,8 @@
 #include <vector>
 
 namespace ground_factor {
+
+using PointType = pcl::PointXYZI;
 
 Eigen::Matrix3d RotX(double a);
 Eigen::Matrix3d RotY(double a);
@@ -44,7 +46,7 @@ struct VehiclePyramidModel {
 
 class GroundModel {
  public:
-  void UpdateFromCloud(const sensor_msgs::PointCloud2 &msg);
+  void UpdateFromCloud(const sensor_msgs::PointCloud2 &msg, bool update_xy = true);
   bool IsReady() const;
 
   Eigen::Vector3d NearestPointXY(const Eigen::Vector2d &xy) const;
@@ -53,6 +55,8 @@ class GroundModel {
   bool FitLocalSurface(const Eigen::Vector2d& xy, double radius, 
                         double outlier_threshold, int min_points,
                         Eigen::Vector3d& fitted_point) const;
+  bool ExtractPatch(const Eigen::Vector2d& xy, double patch_size,
+                    pcl::PointCloud<PointType>::Ptr &ground_patch) const;
 
  private:
   bool NearestIndexXY(const Eigen::Vector2d &xy, int *index_out) const;
@@ -62,7 +66,7 @@ class GroundModel {
                        double threshold, 
                        std::vector<Eigen::Vector3d>& inliers) const;
   mutable std::mutex mutex_;
-  std::vector<Eigen::Vector3d> points_;
+  pcl::PointCloud<PointType>::Ptr ground_cloud_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr xy_cloud_;
   mutable pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_;
   bool ready_{false};

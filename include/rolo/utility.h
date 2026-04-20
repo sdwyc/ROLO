@@ -42,6 +42,7 @@
  
 #include <vector>
 #include <cmath>
+#include <cctype>
 #include <algorithm>
 #include <queue>
 #include <deque>
@@ -127,12 +128,24 @@ public:
     
     // Loop closure
     bool  loopClosureEnableFlag; // 回环检测使能位
+    std::string loopCloseType;
+    std::string scInputType;
     float loopClosureFrequency; // 回环检测频率
     int   surroundingKeyframeSize;
     float historyKeyframeSearchRadius;
     float historyKeyframeSearchTimeDiff;
     int   historyKeyframeSearchNum;
     float historyKeyframeFitnessScore;
+    bool  priorFactorEnableFlag;
+    float priorFactorFrequency;
+    float groundPatchSize;
+    float nearPriorRadius;
+    float priorFitnessScore;
+    float priorTimeValidation;
+    float priorRangeValidation;
+    float priorRotDiffTolerance;
+    float priorTransDiffTolerance;
+    float priorFactorWeight;
 
     // global map visualization radius
     float globalMapVisualizationSearchRadius;
@@ -206,12 +219,41 @@ public:
         nh.param<float>("rolo/surroundingKeyframeSearchRadius", surroundingKeyframeSearchRadius, 50.0);
 
         nh.param<bool>("rolo/loopClosureEnableFlag", loopClosureEnableFlag, true);
+        nh.param<std::string>("rolo/loopCloseType", loopCloseType, "sc");
+        std::transform(loopCloseType.begin(), loopCloseType.end(), loopCloseType.begin(), ::tolower);
+        if (loopCloseType != "sc" && loopCloseType != "rs")
+        {
+            ROS_WARN_STREAM("Invalid rolo/loopCloseType '" << loopCloseType << "', fallback to 'sc'.");
+            loopCloseType = "sc";
+        }
+        nh.param<std::string>("rolo/scInputType", scInputType, "scan_raw");
+        std::transform(scInputType.begin(), scInputType.end(), scInputType.begin(), ::tolower);
+        if (scInputType == "raw")
+            scInputType = "scan_raw";
+        else if (scInputType == "feat")
+            scInputType = "scan_feat";
+        if (scInputType != "scan_raw" && scInputType != "scan_feat")
+        {
+            ROS_WARN_STREAM("Invalid rolo/scInputType '" << scInputType << "', fallback to 'scan_raw'.");
+            scInputType = "scan_raw";
+        }
         nh.param<float>("rolo/loopClosureFrequency", loopClosureFrequency, 1.0);
         nh.param<int>("rolo/surroundingKeyframeSize", surroundingKeyframeSize, 50);
         nh.param<float>("rolo/historyKeyframeSearchRadius", historyKeyframeSearchRadius, 10.0);
         nh.param<float>("rolo/historyKeyframeSearchTimeDiff", historyKeyframeSearchTimeDiff, 30.0);
         nh.param<int>("rolo/historyKeyframeSearchNum", historyKeyframeSearchNum, 25);
         nh.param<float>("rolo/historyKeyframeFitnessScore", historyKeyframeFitnessScore, 0.3);
+        nh.param<bool>("prior_factor/priorFactorEnableFlag", priorFactorEnableFlag, true);
+        nh.param<float>("prior_factor/priorFactorFrequency", priorFactorFrequency, 1.0);
+        nh.param<float>("prior_factor/groundPatchSize", groundPatchSize, 2.0);
+        nh.param<float>("prior_factor/nearPriorRadius", nearPriorRadius, 1.0);
+        nh.param<float>("prior_factor/priorFitnessScore", priorFitnessScore, 0.01);
+        nh.param<float>("prior_factor/priorTimeValidation", priorTimeValidation, 1.0);
+        nh.param<float>("prior_factor/priorRangeValidation", priorRangeValidation, 10.0);
+        nh.param<float>("prior_factor/priorRotDiffTolerance", priorRotDiffTolerance, 5.0f);
+        priorRotDiffTolerance = priorRotDiffTolerance * M_PI / 180.0f;
+        nh.param<float>("prior_factor/priorTransDiffTolerance", priorTransDiffTolerance, 1.0);
+        nh.param<float>("prior_factor/priorFactorWeight", priorFactorWeight, 100.0);
 
         nh.param<float>("rolo/globalMapVisualizationSearchRadius", globalMapVisualizationSearchRadius, 1e3);
         nh.param<float>("rolo/globalMapVisualizationPoseDensity", globalMapVisualizationPoseDensity, 10.0);

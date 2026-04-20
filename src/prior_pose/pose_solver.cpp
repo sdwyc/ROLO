@@ -1,5 +1,6 @@
 #include "rolo/pose_solver.hpp"
 
+#include <pcl/filters/passthrough.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <ros/console.h>
 
@@ -88,32 +89,35 @@ double VehiclePyramidModel::com_to_base_z() const {
   return com_to_base_z_;
 }
 
-void GroundModel::UpdateFromCloud(const sensor_msgs::PointCloud2 &msg) {
-  pcl::PointCloud<pcl::PointXYZ> cloud;
+void GroundModel::UpdateFromCloud(const sensor_msgs::PointCloud2 &msg, bool update_xy) {
+  pcl::PointCloud<PointType> cloud;
   pcl::fromROSMsg(msg, cloud);
 
   std::lock_guard<std::mutex> lock(mutex_);
-  points_.clear();
-  points_.reserve(cloud.size());
+  ground_cloud_.reset(new pcl::PointCloud<PointType>());
+  *ground_cloud_ = cloud;
+  ready_ = !ground_cloud_->empty();
+
+  if (!update_xy) {
+    xy_cloud_.reset();
+    return;
+  }
+
   xy_cloud_.reset(new pcl::PointCloud<pcl::PointXYZ>());
   xy_cloud_->reserve(cloud.size());
 
-  for (const auto &pt : cloud.points) {
-    points_.emplace_back(pt.x, pt.y, pt.z);
+  for (const auto &pt : ground_cloud_->points) {
     xy_cloud_->push_back(pcl::PointXYZ(pt.x, pt.y, 0.0f));
   }
 
   if (!xy_cloud_->empty()) {
     kdtree_.setInputCloud(xy_cloud_);
-    ready_ = true;
-  } else {
-    ready_ = false;
   }
 }
 
 bool GroundModel::IsReady() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return ready_ && !points_.empty();
+  return ready_ && ground_cloud_ != nullptr && !ground_cloud_->empty();
 }
 
 Eigen::Vector3d GroundModel::NearestPointXY(const Eigen::Vector2d &xy) const {
@@ -122,7 +126,8 @@ Eigen::Vector3d GroundModel::NearestPointXY(const Eigen::Vector2d &xy) const {
   if (!NearestIndexXY(xy, &idx)) {
     return Eigen::Vector3d::Zero();
   }
-  return points_[idx];
+  const auto &pt = ground_cloud_->points[idx];
+  return Eigen::Vector3d(pt.x, pt.y, pt.z);
 }
 
 bool GroundModel::AverageHeightAt(const Eigen::Vector2d &xy, double radius,
@@ -137,12 +142,12 @@ bool GroundModel::AverageHeightAt(const Eigen::Vector2d &xy, double radius,
     return false;
   }
 
-  const Eigen::Vector3d nearest = points_[idx];
-  const float center_x = static_cast<float>(nearest.x());
-  const float center_y = static_cast<float>(nearest.y());
+  const auto &nearest = ground_cloud_->points[idx];
+  const float center_x = nearest.x;
+  const float center_y = nearest.y;
 
   if (radius <= 0.0) {
-    *height_out = nearest.z();
+    *height_out = nearest.z;
     return true;
   }
 
@@ -150,19 +155,19 @@ bool GroundModel::AverageHeightAt(const Eigen::Vector2d &xy, double radius,
   std::vector<int> indices;
   std::vector<float> dists;
   if (kdtree_.radiusSearch(center, radius, indices, dists) <= 0) {
-    *height_out = nearest.z();
+    *height_out = nearest.z;
     return true;
   }
 
   if (static_cast<int>(indices.size()) < min_neighbors) {
-    *height_out = nearest.z();
+    *height_out = nearest.z;
     return true;
   }
 
   double sum = 0.0;
   for (int i : indices) {
-    if (i >= 0 && i < static_cast<int>(points_.size())) {
-      sum += points_[i].z();
+    if (i >= 0 && i < static_cast<int>(ground_cloud_->size())) {
+      sum += ground_cloud_->points[i].z;
     }
   }
   *height_out = sum / static_cast<double>(indices.size());
@@ -174,7 +179,8 @@ bool GroundModel::FitLocalSurface(const Eigen::Vector2d& xy, double radius,
                                  Eigen::Vector3d& fitted_point) const {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    if (!ready_ || points_.empty()) {
+    if (!ready_ || ground_cloud_ == nullptr || ground_cloud_->empty() ||
+        xy_cloud_ == nullptr || xy_cloud_->empty()) {
         return false;
     }
 
@@ -192,8 +198,9 @@ bool GroundModel::FitLocalSurface(const Eigen::Vector2d& xy, double radius,
     std::vector<Eigen::Vector3d> neighbors;
     neighbors.reserve(indices.size());
     for (int idx : indices) {
-        if (idx >= 0 && idx < static_cast<int>(points_.size())) {
-            neighbors.push_back(points_[idx]);
+        if (idx >= 0 && idx < static_cast<int>(ground_cloud_->size())) {
+            const auto &pt = ground_cloud_->points[idx];
+            neighbors.emplace_back(pt.x, pt.y, pt.z);
         }
     }
 
@@ -223,6 +230,40 @@ bool GroundModel::FitLocalSurface(const Eigen::Vector2d& xy, double radius,
     fitted_point = Eigen::Vector3d(xy.x(), xy.y(), z_value);
     
     return true;
+}
+
+bool GroundModel::ExtractPatch(const Eigen::Vector2d& xy, double patch_size,
+                               pcl::PointCloud<PointType>::Ptr &ground_patch) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (!ready_ || ground_cloud_ == nullptr || ground_cloud_->empty()) {
+        return false;
+    }
+
+    if (ground_patch == nullptr) {
+        ground_patch.reset(new pcl::PointCloud<PointType>());
+    }
+    ground_patch->clear();
+
+    const double half_size = patch_size * 0.5;
+    pcl::PointCloud<PointType>::Ptr x_filtered(new pcl::PointCloud<PointType>());
+
+    pcl::PassThrough<PointType> pass_x;
+    pass_x.setInputCloud(ground_cloud_);
+    pass_x.setFilterFieldName("x");
+    pass_x.setFilterLimits(xy.x() - half_size, xy.x() + half_size);
+    pass_x.filter(*x_filtered);
+
+    pcl::PassThrough<PointType> pass_y;
+    pass_y.setInputCloud(x_filtered);
+    pass_y.setFilterFieldName("y");
+    pass_y.setFilterLimits(xy.y() - half_size, xy.y() + half_size);
+    pass_y.filter(*ground_patch);
+
+    ground_patch->width = ground_patch->points.size();
+    ground_patch->height = 1;
+    ground_patch->is_dense = ground_cloud_->is_dense;
+    return !ground_patch->empty();
 }
 
 void GroundModel::RemoveOutliers(const std::vector<Eigen::Vector3d>& points,
@@ -287,7 +328,8 @@ bool GroundModel::NearestIndexXY(const Eigen::Vector2d &xy, int *index_out) cons
   if (!index_out) {
     return false;
   }
-  if (!ready_ || points_.empty()) {
+  if (!ready_ || ground_cloud_ == nullptr || ground_cloud_->empty() ||
+      xy_cloud_ == nullptr || xy_cloud_->empty()) {
     return false;
   }
 
@@ -296,7 +338,7 @@ bool GroundModel::NearestIndexXY(const Eigen::Vector2d &xy, int *index_out) cons
   std::vector<float> dists(1);
   if (kdtree_.nearestKSearch(query, 1, indices, dists) > 0) {
     const int idx = indices[0];
-    if (idx >= 0 && idx < static_cast<int>(points_.size())) {
+    if (idx >= 0 && idx < static_cast<int>(ground_cloud_->size())) {
       *index_out = idx;
       return true;
     }

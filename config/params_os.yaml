@@ -52,6 +52,8 @@ rolo:
 
   # Loop closure
   loopClosureEnableFlag: true
+  loopCloseType: sc
+  scInputType: scan_raw
   loopClosureFrequency: 1.0                     # Hz, regulate loop closure constraint add frequency
   surroundingKeyframeSize: 50                   # submap size (when loop closure enabled)
   historyKeyframeSearchRadius: 30.0             # meters, key frame that is within n meters from current pose will be considerd for loop closure
