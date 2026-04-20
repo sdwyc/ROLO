@@ -4,7 +4,7 @@
 #   latch: true
 
 ground_factor_node:
-  pose_topic: /move_base_simple/goal
+  pose_topic: /move_base_simple/goal # For manual debug, useless for running
   # pose_cov_topic: /initialpose
   pose_cov_topic: /fused_odom_future_local_marker
   # frame_id: map
@@ -15,13 +15,19 @@ ground_factor_node:
 
   # Vehicle model
   vehicle_size_xy: 2.0
+
   vehicle_com_z: 1.0
   wheel_xy:  # clockwise base vertices in body frame
     - [-0.747, 0.463] # left-rear
     - [0.713, 0.463] # left-front
     - [0.747, -0.463] # right-front
     - [-0.713, -0.463] # right-rear
-
+  
+  # Body frame (CoM) -> LiDAR frame
+  lidarOffsetTrans: [0, 0, 0.94]
+  lidarOffsetRot: [1, 0, 0,
+                   0, 1, 0,
+                   0, 0, 1]
   # Solver
   k_spring: 20.0
   g: 1.0
@@ -49,3 +55,15 @@ ground_factor_node:
     - [0.713, 0.463] # left-front
     - [0.747, -0.463] # right-front
     - [-0.713, -0.463] # right-rear
+
+prior_factor:
+  priorFactorEnableFlag: true
+  priorFactorFrequency: 5.0     # Hz
+  groundPatchSize: 20.0
+  nearPriorRadius: 0.49999
+  priorFitnessScore: 0.05
+  priorTimeValidation: 30.0
+  priorRangeValidation: 30.0
+  priorRotDiffTolerance: 5.0 # deg
+  priorTransDiffTolerance: 1.0 # m
+  priorFactorWeight: 5000

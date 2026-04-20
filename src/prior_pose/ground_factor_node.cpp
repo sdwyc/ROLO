@@ -3,8 +3,12 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/Point.h>
+#include <nav_msgs/Odometry.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <visualization_msgs/Marker.h>
+
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/common/transforms.h>
 
 #include <tf2/utils.h>
 #include <tf2/LinearMath/Quaternion.h>
@@ -15,10 +19,13 @@
 
 #include <Eigen/Geometry>
 
+#include <limits>
+#include <queue>
 #include <string>
 #include <vector>
 
 #include "rolo/pose_solver.hpp"
+#include "rolo/CloudInfoStamp.h"
 
 namespace {
 
@@ -122,6 +129,29 @@ Eigen::Vector3d LoadVector3(ros::NodeHandle &pnh, const std::string &name,
   return Eigen::Vector3d(x, y, z);
 }
 
+Eigen::Matrix3d LoadMatrix3(ros::NodeHandle &pnh, const std::string &name,
+                            const Eigen::Matrix3d &fallback) {
+  XmlRpc::XmlRpcValue list;
+  if (!pnh.getParam(name, list)) {
+    return fallback;
+  }
+  if (list.getType() != XmlRpc::XmlRpcValue::TypeArray || list.size() < 9) {
+    ROS_WARN("%s should be a flat list of 9 numbers.", name.c_str());
+    return fallback;
+  }
+
+  Eigen::Matrix3d mat = Eigen::Matrix3d::Identity();
+  for (int i = 0; i < 9; ++i) {
+    double value = 0.0;
+    if (!XmlRpcToDouble(list[i], &value)) {
+      ROS_WARN("%s entry %d is not numeric.", name.c_str(), i);
+      return fallback;
+    }
+    mat(i / 3, i % 3) = value;
+  }
+  return mat;
+}
+
 bool ComputeRigidAlignment(const std::vector<Eigen::Vector3d> &src,
                            const std::vector<Eigen::Vector3d> &dst,
                            Eigen::Isometry3d *T_out) {
@@ -190,6 +220,7 @@ class GroundFactorNode {
     pnh.param<std::string>("pcd_topic", pcd_topic_, "/voxel_map");
     pnh.param<std::string>("pose_topic", pose_topic_, "/predicted_pose");
     pnh.param<std::string>("pose_cov_topic", pose_cov_topic_, "/initialpose");
+    nh_.param<std::string>("rolo/odomTopic", odom_topic_, "odometry/imu");
     pnh.param<std::string>("frame_id", frame_id_, "map");
     pnh.param<std::string>("child_frame_id", child_frame_id_, "vehicle");
     pnh.param<std::string>("mesh_resource", mesh_resource_, "package://rolo/resource/meshes/vehicle.dae");
@@ -214,6 +245,7 @@ class GroundFactorNode {
     pnh.param<bool>("publish_model_marker", publish_model_marker_, true);
     pnh.param<double>("model_marker_width", model_marker_width_, 0.05);
     pnh.param<bool>("verbose", verbose_, false);
+    nh_.param<double>("prior_factor/groundPatchSize", ground_patch_size_, 2.0);
 
     std::vector<Eigen::Vector2d> wheel_xy_cw;
     if (LoadWheelXY(pnh, &wheel_xy_cw)) {
@@ -244,11 +276,17 @@ class GroundFactorNode {
       mesh_alignment_.linear() = q_eigen.normalized().toRotationMatrix();
     }
 
-    cloud_sub_ = nh_.subscribe(pcd_topic_, 1, &GroundFactorNode::CloudCallback, this);
-    pose_sub_ = nh_.subscribe(pose_topic_, 1, &GroundFactorNode::PoseCallback, this);
-    pose_cov_sub_ = nh_.subscribe(pose_cov_topic_, 1, &GroundFactorNode::PoseCovCallback, this);
+    body_to_lidar_.setIdentity();
+    body_to_lidar_.translation() = LoadVector3(pnh, "lidarOffsetTrans", Eigen::Vector3d::Zero());
+    body_to_lidar_.linear() = LoadMatrix3(pnh, "lidarOffsetRot", Eigen::Matrix3d::Identity());
 
-    pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("vehicle_pose", 1, true);
+    cloud_sub_ = nh_.subscribe(pcd_topic_, 1, &GroundFactorNode::CloudCallback, this);
+    pose_sub_ = nh_.subscribe(pose_cov_topic_, 1, &GroundFactorNode::PoseCallback, this);
+    odom_sub_ = nh_.subscribe<nav_msgs::Odometry>(
+        odom_topic_ + "_incremental", 1, &GroundFactorNode::OdomCallback, this);
+
+    prior_pub_ = nh_.advertise<rolo::CloudInfoStamp>("vehicle_prior_info", 1, true);
+    extracted_patch_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("extracted_patch_prior", 1, true);
     marker_pub_ = nh_.advertise<visualization_msgs::Marker>("vehicle_marker", 1, true);
     model_marker_pub_ = nh_.advertise<visualization_msgs::Marker>("vehicle_model_marker", 1, true);
   }
@@ -258,12 +296,31 @@ class GroundFactorNode {
     ground_.UpdateFromCloud(*msg);
   }
 
-  void PoseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg) {
-    HandlePose(msg->pose, msg->header.stamp);
+  void PoseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg) {
+    pose_queue_.push(*msg);
   }
 
-  void PoseCovCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg) {
-    HandlePose(msg->pose.pose, msg->header.stamp);
+  void OdomCallback(const nav_msgs::Odometry::ConstPtr &msg) {
+    double odom_time = msg->header.stamp.toSec();
+    while (!pose_queue_.empty()) {
+      geometry_msgs::PoseWithCovarianceStamped &pose_msg = pose_queue_.front();
+      double pose_time = pose_msg.header.stamp.toSec();
+      double time_diff = pose_time - odom_time;
+      if (std::abs(time_diff) < 2e-2) {
+          // printf("Predicted pose synced...\n");
+          const geometry_msgs::PoseWithCovarianceStamped synced_pose = pose_msg;
+          pose_queue_.pop();
+          HandlePose(synced_pose.pose.pose, synced_pose.header.stamp);
+          return;
+      }
+
+      if (time_diff < 0.0) {
+                pose_queue_.pop();
+                continue;
+      }
+
+      return;
+    }
   }
 
   void HandlePose(const geometry_msgs::Pose &pose, const ros::Time &stamp) {
@@ -288,27 +345,56 @@ class GroundFactorNode {
                                           ground_avg_radius_, ground_min_neighbors_,
                                           success, verbose_);
 
-    ROS_WARN("Solved pose result: %d \n", success);
+    // ROS_WARN("Solved pose result: %d \n", success);
 
     if (success){
       tf2::Quaternion q_out;
       q_out.setRPY(sol.roll, sol.pitch, yaw);
       q_out.normalize();
+      Eigen::Quaterniond q_eigen(q_out.w(), q_out.x(), q_out.y(), q_out.z());
+
+      Eigen::Isometry3d T_world_body = Eigen::Isometry3d::Identity();
+      T_world_body.linear() = q_eigen.toRotationMatrix();
+      T_world_body.translation() = Eigen::Vector3d(x, y, sol.z);
+      Eigen::Isometry3d T_world_lidar = T_world_body * body_to_lidar_;
+
+      Eigen::Quaterniond q_lidar_eigen(T_world_lidar.rotation());
+      tf2::Quaternion q_lidar_tf(q_lidar_eigen.x(), q_lidar_eigen.y(),
+                                 q_lidar_eigen.z(), q_lidar_eigen.w());
+      q_lidar_tf.normalize();
+      double roll_lidar = 0.0;
+      double pitch_lidar = 0.0;
+      double yaw_lidar = 0.0;
+      tf2::Matrix3x3(q_lidar_tf).getRPY(roll_lidar, pitch_lidar, yaw_lidar);
 
       geometry_msgs::PoseStamped out_pose;
       out_pose.header.stamp = stamp;
       out_pose.header.frame_id = frame_id_;
-      out_pose.pose.position.x = x;
-      out_pose.pose.position.y = y;
-      out_pose.pose.position.z = sol.z;
-      out_pose.pose.orientation = tf2::toMsg(q_out);
-      pose_pub_.publish(out_pose);
+      out_pose.pose = ToPoseMsg(T_world_lidar);
 
-      Eigen::Quaterniond q_eigen(q_out.w(), q_out.x(), q_out.y(), q_out.z());
-      Eigen::Isometry3d T_world_model = Eigen::Isometry3d::Identity();
-      T_world_model.linear() = q_eigen.toRotationMatrix();
-      T_world_model.translation() = Eigen::Vector3d(x, y, sol.z);
+      rolo::CloudInfoStamp prior_info;
+      prior_info.header = out_pose.header;
+      prior_info.initialGuessX = static_cast<float>(out_pose.pose.position.x);
+      prior_info.initialGuessY = static_cast<float>(out_pose.pose.position.y);
+      prior_info.initialGuessZ = static_cast<float>(out_pose.pose.position.z);
+      prior_info.initialGuessRoll = static_cast<float>(roll_lidar);
+      prior_info.initialGuessPitch = static_cast<float>(pitch_lidar);
+      prior_info.initialGuessYaw = static_cast<float>(yaw_lidar);
 
+      pcl::PointCloud<PointType>::Ptr ground_patch(new pcl::PointCloud<PointType>());
+      if (ground_.ExtractPatch(Eigen::Vector2d(out_pose.pose.position.x, out_pose.pose.position.y),
+                               ground_patch_size_, ground_patch)) {
+        pcl::PointCloud<PointType>::Ptr ground_patch_in_pose_frame(new pcl::PointCloud<PointType>());
+        pcl::transformPointCloud(*ground_patch,
+                                 *ground_patch_in_pose_frame,
+                                 T_world_lidar.inverse().matrix().cast<float>());
+        pcl::toROSMsg(*ground_patch_in_pose_frame, prior_info.extracted_ground);
+      }
+      prior_info.extracted_ground.header = out_pose.header;
+      prior_pub_.publish(prior_info);
+      extracted_patch_pub_.publish(prior_info.extracted_ground);
+
+      Eigen::Isometry3d T_world_model = T_world_lidar * body_to_lidar_.inverse();
       Eigen::Isometry3d T_world_mesh = T_world_model * mesh_alignment_;
 
       visualization_msgs::Marker marker;
@@ -377,15 +463,18 @@ class GroundFactorNode {
   ros::NodeHandle nh_;
   ros::Subscriber cloud_sub_;
   ros::Subscriber pose_sub_;
-  ros::Subscriber pose_cov_sub_;
-  ros::Publisher pose_pub_;
+  ros::Subscriber odom_sub_;
+  ros::Publisher prior_pub_;
+  ros::Publisher extracted_patch_pub_;
   ros::Publisher marker_pub_;
   ros::Publisher model_marker_pub_;
   tf2_ros::TransformBroadcaster tf_broadcaster_;
+  std::queue<geometry_msgs::PoseWithCovarianceStamped> pose_queue_;
 
   std::string pcd_topic_;
   std::string pose_topic_;
   std::string pose_cov_topic_;
+  std::string odom_topic_;
   std::string frame_id_;
   std::string child_frame_id_;
   std::string mesh_resource_;
@@ -406,6 +495,7 @@ class GroundFactorNode {
   double tolerance_roll_{1.0};
   double tolerance_pitch_{1.0};
   double tolerance_wheel_distance_{1.0};
+  double ground_patch_size_{2.0};
   bool publish_tf_{true};
   bool publish_model_marker_{true};
   double model_marker_width_{0.05};
@@ -414,6 +504,7 @@ class GroundFactorNode {
   VehiclePyramidModel vehicle_model_;
   GroundModel ground_;
   Eigen::Isometry3d mesh_alignment_{Eigen::Isometry3d::Identity()};
+  Eigen::Isometry3d body_to_lidar_{Eigen::Isometry3d::Identity()};
   bool mesh_alignment_valid_{false};
 };
 

@@ -321,8 +321,8 @@ class DualOdomDeltaStateNode(object):
         self.world_frame = rospy.get_param("~world_frame", "odometry")
         self.child_frame = rospy.get_param("~child_frame", "base_link")
 
-        self.fusion_rate = rospy.get_param("~fusion_rate", 100.0)
-        self.publish_rate = rospy.get_param("~publish_rate", 20.0)
+        self.fusion_rate = rospy.get_param("~fusion_rate", 50.0)
+        self.publish_rate = rospy.get_param("~publish_rate", 30.0)
         self.publish_use_now_stamp = rospy.get_param("~publish_use_now_stamp", True)
         self.publish_predict_to_now = rospy.get_param("~publish_predict_to_now", True)
 

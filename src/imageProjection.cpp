@@ -411,20 +411,20 @@ public:
 
             float range = pointDistance(thisPoint); // 到雷达原点的距离
             // 距离滤波
-            if (range < lidarMinRange || range > lidarMaxRange)
-                continue;
-            // 行索引为扫瞄线数
-            float angle = atan(laserCloudIn->points[i].z / sqrt(laserCloudIn->points[i].x * laserCloudIn->points[i].x + laserCloudIn->points[i].y * laserCloudIn->points[i].y)) * 180 / M_PI; // 点到基座的俯仰角，单位：degree
-            int scanID = 0;
-            // 判断一个点属于哪个线上的点，scanID为线数的序列号
-            scanID = int((angle + 15) / 2 + 0.5);
-            // std::cout << "point ring: " << scanID << std::endl;
-            if (scanID > (N_SCAN - 1) || scanID < 0)
-            {
-                continue;
-            }
-            int rowIdn = scanID;
-            // int rowIdn = laserCloudIn->points[i].ring;
+            // if (range < lidarMinRange || range > lidarMaxRange)
+            //     continue;
+            // // 行索引为扫瞄线数
+            // float angle = atan(laserCloudIn->points[i].z / sqrt(laserCloudIn->points[i].x * laserCloudIn->points[i].x + laserCloudIn->points[i].y * laserCloudIn->points[i].y)) * 180 / M_PI; // 点到基座的俯仰角，单位：degree
+            // int scanID = 0;
+            // // 判断一个点属于哪个线上的点，scanID为线数的序列号
+            // scanID = int((angle + 15) / 2 + 0.5);
+            // // std::cout << "point ring: " << scanID << std::endl;
+            // if (scanID > (N_SCAN - 1) || scanID < 0)
+            // {
+            //     continue;
+            // }
+            // int rowIdn = scanID;
+            int rowIdn = laserCloudIn->points[i].ring;
             if (rowIdn < 0 || rowIdn >= N_SCAN)
                 continue;
 
