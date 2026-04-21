@@ -411,8 +411,8 @@ public:
 
             float range = pointDistance(thisPoint); // 到雷达原点的距离
             // 距离滤波
-            // if (range < lidarMinRange || range > lidarMaxRange)
-            //     continue;
+            if (range < lidarMinRange || range > lidarMaxRange)
+                continue;
             // // 行索引为扫瞄线数
             // float angle = atan(laserCloudIn->points[i].z / sqrt(laserCloudIn->points[i].x * laserCloudIn->points[i].x + laserCloudIn->points[i].y * laserCloudIn->points[i].y)) * 180 / M_PI; // 点到基座的俯仰角，单位：degree
             // int scanID = 0;

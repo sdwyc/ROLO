@@ -13,6 +13,7 @@ endif()
 
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
+  jsk_recognition_msgs
   nav_msgs
   cv_bridge
   pcl_ros
@@ -124,6 +125,7 @@ catkin_package(
   std_msgs
   nav_msgs
   geometry_msgs
+  jsk_recognition_msgs
   sensor_msgs
   message_runtime
   visualization_msgs
@@ -196,13 +198,13 @@ if(TARGET small_gicp_vendor)
   target_link_libraries(${PROJECT_NAME}_backMapping small_gicp_vendor)
 endif()
 
-add_executable(ground_factor_node
+add_executable(prior_pose_node
   src/prior_pose/pose_solver.cpp
-  src/prior_pose/ground_factor_node.cpp
+  src/prior_pose/prior_pose_node.cpp
 )
-add_dependencies(ground_factor_node ${PROJECT_NAME}_generate_messages_cpp)
-target_compile_options(ground_factor_node PRIVATE ${OpenMP_CXX_FLAGS})
-target_link_libraries(ground_factor_node
+add_dependencies(prior_pose_node ${PROJECT_NAME}_generate_messages_cpp)
+target_compile_options(prior_pose_node PRIVATE ${OpenMP_CXX_FLAGS})
+target_link_libraries(prior_pose_node
   ${catkin_LIBRARIES}
   ${PCL_LIBRARIES}
   ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam

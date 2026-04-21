@@ -10,6 +10,7 @@ Panels:
         - /Prediction1/Covariance1
         - /Prediction1/Covariance1/Position1
         - /Prediction1/Covariance1/Orientation1
+        - /Prior_Predictions1
       Splitter Ratio: 0.6797752976417542
     Tree Height: 638
   - Class: rviz/Selection
@@ -26,7 +27,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: PointCloud2
+    SyncSource: Map (cloud)
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -686,14 +687,23 @@ Visualization Manager:
         prior_pose: true
       Queue Size: 100
       Value: true
-    - Class: rviz/MarkerArray
+    - Class: jsk_rviz_plugin/BoundingBoxArray
       Enabled: true
-      Marker Topic: /rolo/mapping/prior_predictions
-      Name: MarkerArray
-      Namespaces:
-        {}
+      Name: Prior_Predictions
       Queue Size: 100
+      Topic: /rolo/mapping/prior_predictions
+      Unreliable: false
       Value: true
+      alpha: 0.800000011920929
+      alpha max: 1
+      alpha method: flat
+      alpha min: 0
+      color: 25; 255; 0
+      coloring: Label
+      line width: 0.05000000074505806
+      only edge: true
+      show coords: true
+      value threshold: 0
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -738,7 +748,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 32.81782531738281
+      Distance: 25.798324584960938
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -754,9 +764,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.42979735136032104
+      Pitch: 0.29479748010635376
       Target Frame: base_link
-      Yaw: 4.691596508026123
+      Yaw: 2.451591730117798
     Saved: ~
 Window Geometry:
   Displays:

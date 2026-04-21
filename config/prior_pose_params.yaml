@@ -3,7 +3,7 @@
 #   topic: $(arg pcd_topic)
 #   latch: true
 
-ground_factor_node:
+prior_pose_node:
   pose_topic: /move_base_simple/goal # For manual debug, useless for running
   # pose_cov_topic: /initialpose
   pose_cov_topic: /fused_odom_future_local_marker
@@ -17,11 +17,10 @@ ground_factor_node:
   vehicle_size_xy: 2.0
 
   vehicle_com_z: 1.0
-  wheel_xy:  # clockwise base vertices in body frame
-    - [-0.747, 0.463] # left-rear
-    - [0.713, 0.463] # left-front
-    - [0.747, -0.463] # right-front
-    - [-0.713, -0.463] # right-rear
+  wheel_xy: [-0.747, 0.463,   
+             0.713, 0.463,   
+             0.747, -0.463,   
+             -0.713, -0.463]  # [x1, y1, x2, y2, ...] in body frame
   
   # Body frame (CoM) -> LiDAR frame
   lidarOffsetTrans: [0, 0, 0.94]
@@ -50,20 +49,17 @@ ground_factor_node:
   # Mesh alignment (optional)
   mesh_offset: [0.0, 0.0, -1.0]
   mesh_rpy: [0.0, 0.0, 0.0]
-  mesh_wheel_points:  # wheel 3D points in mesh frame, same order as wheel_xy
-    - [-0.747, 0.463] # left-rear
-    - [0.713, 0.463] # left-front
-    - [0.747, -0.463] # right-front
-    - [-0.713, -0.463] # right-rear
+  mesh_wheel_points: [-0.747, 0.463, 0.0,   0.713, 0.463, 0.0,   0.747, -0.463, 0.0,   -0.713, -0.463, 0.0]  # [x1, y1, z1, x2, y2, z2, ...]
 
 prior_factor:
   priorFactorEnableFlag: true
   priorFactorFrequency: 5.0     # Hz
   groundPatchSize: 20.0
-  nearPriorRadius: 0.49999
+  nearPriorRadius: 0.99999
   priorFitnessScore: 0.05
   priorTimeValidation: 30.0
   priorRangeValidation: 30.0
   priorRotDiffTolerance: 5.0 # deg
   priorTransDiffTolerance: 1.0 # m
   priorFactorWeight: 5000
+  priorSyncedInterval: 1.0

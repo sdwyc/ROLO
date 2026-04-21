@@ -12,7 +12,7 @@ rolo:
   
   # Export settings
   savePCD: false                              # The enable setting for save global keyframes
-  savePCDDirectory: "/Downloads/LOAM/"        # Save path of map in your home folder, starts and ends with "/".
+  savePCDDirectory: "/results/"               # Save path relative to rolo pkg, starts and ends with "/".
 
   # Sensor Settings
   sensor: velodyne                            # lidar sensor type, 'velodyne' or 'ouster' or 'livox'

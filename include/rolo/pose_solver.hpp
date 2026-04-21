@@ -3,6 +3,8 @@
 #define ROLO_POSE_SOLVER_HPP_
 #define PCL_NO_PRECOMPILE
 
+#include "rolo/utility.h"
+
 #include <sensor_msgs/PointCloud2.h>
 
 #include <pcl/kdtree/kdtree_flann.h>
@@ -19,29 +21,37 @@
 
 namespace ground_factor {
 
-using PointType = pcl::PointXYZI;
-
 Eigen::Matrix3d RotX(double a);
 Eigen::Matrix3d RotY(double a);
 Eigen::Matrix3d RotZ(double a);
 Eigen::Matrix3d Skew(const Eigen::Vector3d &v);
 
-struct VehiclePyramidModel {
-  VehiclePyramidModel() = default;
-  VehiclePyramidModel(const std::vector<Eigen::Vector2d> &base_xy_cw,
-                      double com_to_base_z);
+struct VehicleModel {
+  VehicleModel() = default;
+  VehicleModel(const std::vector<Eigen::Vector2d> &wheel_xy_cw,
+               double vehicle_com_z,
+               const Eigen::Vector3d &body_to_lidar_trans = Eigen::Vector3d::Zero(),
+               const Eigen::Matrix3d &body_to_lidar_rot = Eigen::Matrix3d::Identity());
 
-  static VehiclePyramidModel FromSquare(double size_xy, double com_to_base_z);
+  static VehicleModel FromSquare(double size_xy, double vehicle_com_z,
+                                 const Eigen::Vector3d &body_to_lidar_trans = Eigen::Vector3d::Zero(),
+                                 const Eigen::Matrix3d &body_to_lidar_rot = Eigen::Matrix3d::Identity());
 
   size_t NumContacts() const;
+  const std::vector<Eigen::Vector3d> &wheel_points_body() const;
   const std::vector<Eigen::Vector3d> &base_vertices_b() const;
+  const Eigen::Vector3d &body_origin() const;
   const Eigen::Vector3d &apex_b() const;
+  double vehicle_com_z() const;
   double com_to_base_z() const;
+  const Eigen::Affine3d &body_to_lidar() const;
+  Eigen::Affine3d lidar_to_body() const;
 
  private:
-  double com_to_base_z_{0.0};
-  std::vector<Eigen::Vector3d> base_vertices_b_;
-  Eigen::Vector3d apex_b_{Eigen::Vector3d::Zero()};
+  double vehicle_com_z_{0.0};
+  std::vector<Eigen::Vector3d> wheel_points_body_;
+  Eigen::Vector3d body_origin_{Eigen::Vector3d::Zero()};
+  Eigen::Affine3d body_to_lidar_{Eigen::Affine3d::Identity()};
 };
 
 class GroundModel {
@@ -56,7 +66,7 @@ class GroundModel {
                         double outlier_threshold, int min_points,
                         Eigen::Vector3d& fitted_point) const;
   bool ExtractPatch(const Eigen::Vector2d& xy, double patch_size,
-                    pcl::PointCloud<PointType>::Ptr &ground_patch) const;
+                    pcl::PointCloud<::GroundPatchType>::Ptr &ground_patch) const;
 
  private:
   bool NearestIndexXY(const Eigen::Vector2d &xy, int *index_out) const;
@@ -66,7 +76,7 @@ class GroundModel {
                        double threshold, 
                        std::vector<Eigen::Vector3d>& inliers) const;
   mutable std::mutex mutex_;
-  pcl::PointCloud<PointType>::Ptr ground_cloud_;
+  pcl::PointCloud<::GroundPatchType>::Ptr ground_cloud_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr xy_cloud_;
   mutable pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_;
   bool ready_{false};
@@ -85,7 +95,7 @@ struct SolverResult {
 
 class PoseSolver {
  public:
-  PoseSolver(const VehiclePyramidModel &vehicle, const GroundModel &ground,
+  PoseSolver(const VehicleModel &vehicle, const GroundModel &ground,
              double z_min, double z_max,
              double roll_abs_max, double pitch_abs_max,
              double wheel_distance_abs_max);
@@ -116,7 +126,7 @@ class PoseSolver {
               
   bool FailureDetection(const SolverResult &res) const;
 
-  const VehiclePyramidModel &vehicle_;
+  const VehicleModel &vehicle_;
   const GroundModel &ground_;
   double z_min_{0.0};
   double z_max_{0.0};
