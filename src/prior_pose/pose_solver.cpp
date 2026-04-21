@@ -51,50 +51,78 @@ Eigen::Matrix3d Skew(const Eigen::Vector3d &v) {
   return S;
 }
 
-VehiclePyramidModel::VehiclePyramidModel(const std::vector<Eigen::Vector2d> &base_xy_cw,
-                                         double com_to_base_z)
-    : com_to_base_z_(com_to_base_z) {
-  base_vertices_b_.clear();
-  base_vertices_b_.reserve(base_xy_cw.size());
-  for (const auto &xy : base_xy_cw) {
-    base_vertices_b_.emplace_back(xy.x(), xy.y(), -com_to_base_z_);
+VehicleModel::VehicleModel(const std::vector<Eigen::Vector2d> &wheel_xy_cw,
+                           double vehicle_com_z,
+                           const Eigen::Vector3d &body_to_lidar_trans,
+                           const Eigen::Matrix3d &body_to_lidar_rot)
+    : vehicle_com_z_(vehicle_com_z) {
+  wheel_points_body_.clear();
+  wheel_points_body_.reserve(wheel_xy_cw.size());
+  for (const auto &xy : wheel_xy_cw) {
+    wheel_points_body_.emplace_back(xy.x(), xy.y(), -vehicle_com_z_);
   }
-  apex_b_.setZero();
+
+  body_origin_.setZero();
+  body_to_lidar_.setIdentity();
+  body_to_lidar_.translation() = body_to_lidar_trans;
+  body_to_lidar_.linear() = body_to_lidar_rot;
 }
 
-VehiclePyramidModel VehiclePyramidModel::FromSquare(double size_xy, double com_to_base_z) {
+VehicleModel VehicleModel::FromSquare(double size_xy, double vehicle_com_z,
+                                      const Eigen::Vector3d &body_to_lidar_trans,
+                                      const Eigen::Matrix3d &body_to_lidar_rot) {
   const double half = size_xy / 2.0;
-  std::vector<Eigen::Vector2d> base_xy_cw = {
+  std::vector<Eigen::Vector2d> wheel_xy_cw = {
     Eigen::Vector2d(-half, +half),
     Eigen::Vector2d(+half, +half),
     Eigen::Vector2d(+half, -half),
     Eigen::Vector2d(-half, -half)
   };
-  return VehiclePyramidModel(base_xy_cw, com_to_base_z);
+  return VehicleModel(wheel_xy_cw, vehicle_com_z, body_to_lidar_trans, body_to_lidar_rot);
 }
 
-size_t VehiclePyramidModel::NumContacts() const {
-  return base_vertices_b_.size();
+size_t VehicleModel::NumContacts() const {
+  return wheel_points_body_.size();
 }
 
-const std::vector<Eigen::Vector3d> &VehiclePyramidModel::base_vertices_b() const {
-  return base_vertices_b_;
+const std::vector<Eigen::Vector3d> &VehicleModel::wheel_points_body() const {
+  return wheel_points_body_;
 }
 
-const Eigen::Vector3d &VehiclePyramidModel::apex_b() const {
-  return apex_b_;
+const std::vector<Eigen::Vector3d> &VehicleModel::base_vertices_b() const {
+  return wheel_points_body_;
 }
 
-double VehiclePyramidModel::com_to_base_z() const {
-  return com_to_base_z_;
+const Eigen::Vector3d &VehicleModel::body_origin() const {
+  return body_origin_;
+}
+
+const Eigen::Vector3d &VehicleModel::apex_b() const {
+  return body_origin_;
+}
+
+double VehicleModel::vehicle_com_z() const {
+  return vehicle_com_z_;
+}
+
+double VehicleModel::com_to_base_z() const {
+  return vehicle_com_z_;
+}
+
+const Eigen::Affine3d &VehicleModel::body_to_lidar() const {
+  return body_to_lidar_;
+}
+
+Eigen::Affine3d VehicleModel::lidar_to_body() const {
+  return body_to_lidar_.inverse();
 }
 
 void GroundModel::UpdateFromCloud(const sensor_msgs::PointCloud2 &msg, bool update_xy) {
-  pcl::PointCloud<PointType> cloud;
+  pcl::PointCloud<::GroundPatchType> cloud;
   pcl::fromROSMsg(msg, cloud);
 
   std::lock_guard<std::mutex> lock(mutex_);
-  ground_cloud_.reset(new pcl::PointCloud<PointType>());
+  ground_cloud_.reset(new pcl::PointCloud<::GroundPatchType>());
   *ground_cloud_ = cloud;
   ready_ = !ground_cloud_->empty();
 
@@ -233,7 +261,7 @@ bool GroundModel::FitLocalSurface(const Eigen::Vector2d& xy, double radius,
 }
 
 bool GroundModel::ExtractPatch(const Eigen::Vector2d& xy, double patch_size,
-                               pcl::PointCloud<PointType>::Ptr &ground_patch) const {
+                               pcl::PointCloud<::GroundPatchType>::Ptr &ground_patch) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (!ready_ || ground_cloud_ == nullptr || ground_cloud_->empty()) {
@@ -241,20 +269,20 @@ bool GroundModel::ExtractPatch(const Eigen::Vector2d& xy, double patch_size,
     }
 
     if (ground_patch == nullptr) {
-        ground_patch.reset(new pcl::PointCloud<PointType>());
+        ground_patch.reset(new pcl::PointCloud<::GroundPatchType>());
     }
     ground_patch->clear();
 
     const double half_size = patch_size * 0.5;
-    pcl::PointCloud<PointType>::Ptr x_filtered(new pcl::PointCloud<PointType>());
+    pcl::PointCloud<::GroundPatchType>::Ptr x_filtered(new pcl::PointCloud<::GroundPatchType>());
 
-    pcl::PassThrough<PointType> pass_x;
+    pcl::PassThrough<::GroundPatchType> pass_x;
     pass_x.setInputCloud(ground_cloud_);
     pass_x.setFilterFieldName("x");
     pass_x.setFilterLimits(xy.x() - half_size, xy.x() + half_size);
     pass_x.filter(*x_filtered);
 
-    pcl::PassThrough<PointType> pass_y;
+    pcl::PassThrough<::GroundPatchType> pass_y;
     pass_y.setInputCloud(x_filtered);
     pass_y.setFilterFieldName("y");
     pass_y.setFilterLimits(xy.y() - half_size, xy.y() + half_size);
@@ -348,7 +376,7 @@ bool GroundModel::NearestIndexXY(const Eigen::Vector2d &xy, int *index_out) cons
 }
 
 // ... 其余代码保持不变 ...
-PoseSolver::PoseSolver(const VehiclePyramidModel &vehicle, const GroundModel &ground,
+PoseSolver::PoseSolver(const VehicleModel &vehicle, const GroundModel &ground,
                        double z_min, double z_max,
                        double roll_abs_max, double pitch_abs_max,
                        double wheel_distance_abs_max)

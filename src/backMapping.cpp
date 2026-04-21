@@ -8,8 +8,8 @@
 #include <small_gicp/registration/reduction_omp.hpp>
 #include <small_gicp/registration/registration.hpp>
 #include <small_gicp/util/normal_estimation_omp.hpp>
-#include <xmlrpcpp/XmlRpcValue.h>
-
+#include <boost/filesystem.hpp>
+#include <fstream>
 #include <gtsam/geometry/Rot3.h>
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/slam/PriorFactor.h>
@@ -67,56 +67,6 @@ POINT_CLOUD_REGISTER_POINT_STRUCT (PointXYZIRPYT,
 
 typedef PointXYZIRPYT  PointTypePose;
 
-namespace {
-
-bool XmlRpcToDouble(const XmlRpc::XmlRpcValue &value, double *out)
-{
-    if (!out)
-        return false;
-    if (value.getType() == XmlRpc::XmlRpcValue::TypeInt)
-    {
-        *out = static_cast<int>(value);
-        return true;
-    }
-    if (value.getType() == XmlRpc::XmlRpcValue::TypeDouble)
-    {
-        *out = static_cast<double>(value);
-        return true;
-    }
-    return false;
-}
-
-bool LoadWheelXY(ros::NodeHandle &nh, std::vector<Eigen::Vector2f> *out)
-{
-    if (!out)
-        return false;
-
-    XmlRpc::XmlRpcValue list;
-    if (!nh.getParam("ground_factor_node/wheel_xy", list))
-        return false;
-    if (list.getType() != XmlRpc::XmlRpcValue::TypeArray)
-        return false;
-
-    out->clear();
-    for (int i = 0; i < list.size(); ++i)
-    {
-        const XmlRpc::XmlRpcValue &entry = list[i];
-        if (entry.getType() != XmlRpc::XmlRpcValue::TypeArray || entry.size() < 2)
-            return false;
-
-        double x = 0.0;
-        double y = 0.0;
-        if (!XmlRpcToDouble(entry[0], &x) || !XmlRpcToDouble(entry[1], &y))
-            return false;
-
-        out->emplace_back(static_cast<float>(x), static_cast<float>(y));
-    }
-
-    return !out->empty();
-}
-
-} // namespace
-
 class backMapping : public ParamLoader
 {
 public:
@@ -156,8 +106,8 @@ public:
     ros::ServiceServer srvSaveMap;
 
     ground_factor::GroundModel groundCloudModelFromlaser;
-    pcl::PointCloud<PointType>::Ptr GroundCloudFromlaser;
-    std::string voxelMapTopic = "/voxel_map";
+    ground_factor::VehicleModel priorVehicleModel;
+    pcl::PointCloud<GroundPatchType>::Ptr GroundCloudFromlaser;
 
     std::deque<nav_msgs::Odometry> gpsQueue;
     rolo::CloudInfoStamp cloudInfo;
@@ -223,7 +173,7 @@ public:
     int laserCloudCornerLastDSNum = 0;
     int laserCloudSurfLastDSNum = 0;
     bool aPriorPose = false;
-    deque<pair<std::array<double, 6>, pcl::PointCloud<PointType>>> priorPosePatchHistory;
+    deque<pair<std::array<double, 6>, pcl::PointCloud<GroundPatchType>>> priorPosePatchHistory;
     deque<pair<double, int>> priorTimeKeyQueue;
     vector<pair<int, int>> priorIndexQueue;  // 匹配上的回环对，first为历史时刻的关键帧索引，second为当前的关键帧索引
     map<int, pair<int, std::array<float, 6>>> priorVisContainer; // key: current key, value.first: linked key, value.second: linked_pose -> prior_pose relative transform
@@ -239,10 +189,6 @@ public:
     deque<std_msgs::Float64MultiArray> loopInfoVec; // 外部给定的回环对，每个元素是一个数组，每个数组两个元素，0：当前帧，1：历史帧
 
     nav_msgs::Path globalPath;
-
-    float priorVehicleComZ = 1.0f;
-    float priorVehicleSizeX = 2.0f;
-    float priorVehicleSizeY = 2.0f;
 
     Eigen::Affine3f transPointAssociateToMap;
     Eigen::Affine3f incrementalOdometryAffineFront; // 上一时刻的全局里程计位姿
@@ -264,8 +210,7 @@ public:
         // Feature extration传过来的cloud_info
         subCloud = nh.subscribe<rolo::CloudInfoStamp>(odomTopic+"/cloud_info", 1, &backMapping::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
         subPriorPose = nh.subscribe<rolo::CloudInfoStamp>("vehicle_prior_info", 1, &backMapping::priorInfoHandler, this, ros::TransportHints().tcpNoDelay());
-        nh.param<std::string>("ground_factor_node/pcd_topic", voxelMapTopic, "/voxel_map");
-        subGroundMap = nh.subscribe<sensor_msgs::PointCloud2>(voxelMapTopic, 1, &backMapping::groundMapHandler, this, ros::TransportHints().tcpNoDelay());
+        subGroundMap = nh.subscribe<sensor_msgs::PointCloud2>(priorPoseNodePcdTopic, 1, &backMapping::groundMapHandler, this, ros::TransportHints().tcpNoDelay());
 
         // 回环数据
         // subLoop  = nh.subscribe<std_msgs::Float64MultiArray>("lio_loop/loop_closure_detection", 1, &backMapping::loopInfoHandler, this, ros::TransportHints().tcpNoDelay());
@@ -278,7 +223,7 @@ public:
         pubIcpKeyFrames       = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/icp_loop_closure_corrected_cloud", 1);
         pubGlobalGraph        = nh.advertise<visualization_msgs::MarkerArray>("rolo/mapping/global_graph", 1);
         pubLoopConstraintEdge = nh.advertise<visualization_msgs::MarkerArray>("/rolo/mapping/loop_closure_constraints", 1);
-        pubPriorPredictions   = nh.advertise<visualization_msgs::MarkerArray>("/rolo/mapping/prior_predictions", 1);
+        pubPriorPredictions   = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>("/rolo/mapping/prior_predictions", 1);
         pubPriorPatches       = nh.advertise<sensor_msgs::PointCloud2>("/rolo/mapping/prior_patches", 1);
         pubCurrentPatch       = nh.advertise<sensor_msgs::PointCloud2>("extracted_patch_current", 1);
         //  局部地图
@@ -296,24 +241,39 @@ public:
         downSizeFilterICP.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
         downSizeFilterSurroundingKeyPoses.setLeafSize(surroundingKeyframeDensity, surroundingKeyframeDensity, surroundingKeyframeDensity); // for surrounding key poses of scan-to-map optimization
 
-        nh.param<float>("ground_factor_node/vehicle_com_z", priorVehicleComZ, 1.0f);
-        std::vector<Eigen::Vector2f> prior_wheel_xy;
-        if (LoadWheelXY(nh, &prior_wheel_xy))
+        if (!priorWheelXY.empty())
+            priorVehicleModel = ground_factor::VehicleModel(priorWheelXY, priorVehicleComZ,
+                                                            priorLidarOffsetTrans, priorLidarOffsetRot);
+        else
+            priorVehicleModel = ground_factor::VehicleModel::FromSquare(priorVehicleSizeXY, priorVehicleComZ,
+                                                                        priorLidarOffsetTrans, priorLidarOffsetRot);
+
+        if (savePCD)
         {
-            float min_x = std::numeric_limits<float>::max();
-            float max_x = std::numeric_limits<float>::lowest();
-            float min_y = std::numeric_limits<float>::max();
-            float max_y = std::numeric_limits<float>::lowest();
-            for (const auto &xy : prior_wheel_xy)
+            const std::string pkg_path = ros::package::getPath("rolo");
+            if (pkg_path.empty())
             {
-                min_x = std::min(min_x, xy.x());
-                max_x = std::max(max_x, xy.x());
-                min_y = std::min(min_y, xy.y());
-                max_y = std::max(max_y, xy.y());
+                ROS_ERROR("Failed to resolve ROLO package path for saving PCDs.");
             }
-            priorVehicleSizeX = std::max(max_x - min_x, 0.1f);
-            priorVehicleSizeY = std::max(max_y - min_y, 0.1f);
+            else
+            {
+                if (!savePCDDirectory.empty() && savePCDDirectory.front() == '/')
+                    savePCDDirectory = pkg_path + savePCDDirectory;
+                else
+                    savePCDDirectory = pkg_path + "/" + savePCDDirectory;
+
+                if (!savePCDDirectory.empty() && savePCDDirectory.back() != '/')
+                    savePCDDirectory += "/";
+
+                if (!boost::filesystem::exists(savePCDDirectory))
+                    boost::filesystem::create_directories(savePCDDirectory);
+
+                const std::string keyframes_dir = savePCDDirectory + "keyframes/";
+                if (!boost::filesystem::exists(keyframes_dir))
+                    boost::filesystem::create_directories(keyframes_dir);
+            }
         }
+
         // 为变量分配内存空间，赋初值
         allocateMemory();
     }
@@ -430,7 +390,7 @@ public:
 
         kdtreeCornerFromMap.reset(new pcl::KdTreeFLANN<PointType>());
         kdtreeSurfFromMap.reset(new pcl::KdTreeFLANN<PointType>());
-        GroundCloudFromlaser.reset(new pcl::PointCloud<PointType>());
+        GroundCloudFromlaser.reset(new pcl::PointCloud<GroundPatchType>());
 
         for (int i = 0; i < 6; ++i){
             transformTobeMapped[i] = 0;
@@ -444,7 +404,7 @@ public:
     {
         groundCloudModelFromlaser.UpdateFromCloud(*msgIn, false);
         if (GroundCloudFromlaser == nullptr) {
-            GroundCloudFromlaser.reset(new pcl::PointCloud<PointType>());
+            GroundCloudFromlaser.reset(new pcl::PointCloud<GroundPatchType>());
         }
 
         if (!groundCloudModelFromlaser.ExtractPatch(Eigen::Vector2d::Zero(),
@@ -498,12 +458,35 @@ public:
 
     void priorInfoHandler(const rolo::CloudInfoStampConstPtr& msgIn)
     {
-        double latestKeyTime = cloudKeyPoses6D->back().time;
-        int latestKeyID = cloudKeyPoses6D->size() - 1;
+        const double msgTime = msgIn->header.stamp.toSec();
+        double latestKeyTime = 0.0;
+        int latestKeyID = -1;
+        mtx.lock();
+        if (!cloudKeyPoses6D->empty())
+        {
+            latestKeyTime = cloudKeyPoses6D->back().time;
+            latestKeyID = static_cast<int>(cloudKeyPoses6D->size()) - 1;
+        }
+        mtx.unlock();
+        if (latestKeyID < 0)
+            return;
+
         printf("time diff: %f \n", std::abs(msgIn->header.stamp.toSec() - latestKeyTime));
         if (latestKeyID <= 9 || std::abs(msgIn->header.stamp.toSec() - latestKeyTime) >= 1e-2)
         // if (std::abs(msgIn->header.stamp.toSec() - latestKeyTime) >= 1e-2)
             return;
+
+        mtx.lock();
+        if (!priorTimeKeyQueue.empty() && priorSyncedInterval > 0.0f)
+        {
+            const double lastPriorTime = priorTimeKeyQueue.back().first;
+            if (msgTime - lastPriorTime < static_cast<double>(priorSyncedInterval))
+            {
+                mtx.unlock();
+                return;
+            }
+        }
+        mtx.unlock();
 
         priorPoseCur[0] = msgIn->initialGuessRoll;
         priorPoseCur[1] = msgIn->initialGuessPitch;
@@ -512,7 +495,7 @@ public:
         priorPoseCur[4] = msgIn->initialGuessY;
         priorPoseCur[5] = msgIn->initialGuessZ;
 
-        pcl::PointCloud<PointType> prior_ground_patch;
+        pcl::PointCloud<GroundPatchType> prior_ground_patch;
         pcl::fromROSMsg(msgIn->extracted_ground, prior_ground_patch);
 
         std::array<double, 6> prior_pose = {
@@ -525,7 +508,7 @@ public:
         };
         mtx.lock();
         priorPosePatchHistory.push_back(std::make_pair(prior_pose, prior_ground_patch));
-        priorTimeKeyQueue.push_back(std::make_pair(msgIn->header.stamp.toSec(), latestKeyID));
+        priorTimeKeyQueue.push_back(std::make_pair(msgTime, latestKeyID));
         mtx.unlock();
     }
 
@@ -1484,12 +1467,144 @@ public:
         if (savePCD == false)
             return;
 
-        // lio_sam::save_mapRequest  req;
-        // lio_sam::save_mapResponse res;
+        saveGlobalPCDs();
+    }
 
-        // if(!saveMapService(req, res)){
-        //     cout << "Fail to save map" << endl;
-        // }
+    std::string zeroPadIndex(int idx) const
+    {
+        std::ostringstream oss;
+        oss << std::setw(6) << std::setfill('0') << idx;
+        return oss.str();
+    }
+
+    void writeG2OVertex(std::ostream &os, int node_idx, const gtsam::Pose3 &pose) const
+    {
+        const gtsam::Point3 t = pose.translation();
+        const gtsam::Rot3 R = pose.rotation();
+        os << "VERTEX_SE3:QUAT " << node_idx << " "
+           << t.x() << " " << t.y() << " " << t.z() << " "
+           << R.toQuaternion().x() << " " << R.toQuaternion().y() << " "
+           << R.toQuaternion().z() << " " << R.toQuaternion().w() << "\n";
+    }
+
+    void writeG2OEdge(std::ostream &os, int from_idx, int to_idx, const gtsam::Pose3 &relative_pose) const
+    {
+        const gtsam::Point3 t = relative_pose.translation();
+        const gtsam::Rot3 R = relative_pose.rotation();
+        os << "EDGE_SE3:QUAT " << from_idx << " " << to_idx << " "
+           << t.x() << " " << t.y() << " " << t.z() << " "
+           << R.toQuaternion().x() << " " << R.toQuaternion().y() << " "
+           << R.toQuaternion().z() << " " << R.toQuaternion().w() << "\n";
+    }
+
+    void saveGlobalPCDs()
+    {
+        pcl::PointCloud<PointType>::Ptr keyPoses3DCopy(new pcl::PointCloud<PointType>());
+        pcl::PointCloud<PointTypePose>::Ptr keyPoses6DCopy(new pcl::PointCloud<PointTypePose>());
+        std::vector<pcl::PointCloud<PointType>::Ptr> cornerKeyFramesCopy;
+        std::vector<pcl::PointCloud<PointType>::Ptr> surfKeyFramesCopy;
+        std::map<int, int> loopIndexContainerCopy;
+        std::map<int, std::pair<int, std::array<float, 6>>> priorVisContainerCopy;
+
+        mtx.lock();
+        if (cloudKeyPoses6D->points.empty())
+        {
+            mtx.unlock();
+            return;
+        }
+
+        *keyPoses3DCopy = *cloudKeyPoses3D;
+        *keyPoses6DCopy = *cloudKeyPoses6D;
+        cornerKeyFramesCopy = cornerCloudKeyFrames;
+        surfKeyFramesCopy = surfCloudKeyFrames;
+        loopIndexContainerCopy = loopIndexContainer;
+        priorVisContainerCopy = priorVisContainer;
+        mtx.unlock();
+
+        const std::string keyframes_dir = savePCDDirectory + "keyframes/";
+
+        const size_t num_keyframes = std::min(keyPoses3DCopy->size(),
+                                              std::min(keyPoses6DCopy->size(),
+                                                       std::min(cornerKeyFramesCopy.size(), surfKeyFramesCopy.size())));
+        if (num_keyframes == 0)
+            return;
+
+        pcl::PointCloud<PointType>::Ptr trajectoryCopy(new pcl::PointCloud<PointType>());
+        pcl::PointCloud<PointTypePose>::Ptr transformationsCopy(new pcl::PointCloud<PointTypePose>());
+        trajectoryCopy->points.assign(keyPoses3DCopy->points.begin(), keyPoses3DCopy->points.begin() + num_keyframes);
+        transformationsCopy->points.assign(keyPoses6DCopy->points.begin(), keyPoses6DCopy->points.begin() + num_keyframes);
+        trajectoryCopy->width = trajectoryCopy->points.size();
+        trajectoryCopy->height = 1;
+        trajectoryCopy->is_dense = keyPoses3DCopy->is_dense;
+        transformationsCopy->width = transformationsCopy->points.size();
+        transformationsCopy->height = 1;
+        transformationsCopy->is_dense = keyPoses6DCopy->is_dense;
+
+        pcl::io::savePCDFileBinary(savePCDDirectory + "trajectory.pcd", *trajectoryCopy);
+        pcl::io::savePCDFileBinary(savePCDDirectory + "transformations.pcd", *transformationsCopy);
+
+        pcl::PointCloud<PointType>::Ptr globalMapCloud(new pcl::PointCloud<PointType>());
+        for (size_t i = 0; i < num_keyframes; ++i)
+        {
+            pcl::PointCloud<PointType>::Ptr keyframeCloud(new pcl::PointCloud<PointType>());
+            *keyframeCloud += *cornerKeyFramesCopy[i];
+            *keyframeCloud += *surfKeyFramesCopy[i];
+            pcl::io::savePCDFileBinary(keyframes_dir + zeroPadIndex(static_cast<int>(i)) + ".pcd",
+                                       *keyframeCloud);
+
+            *globalMapCloud += *transformPointCloud(keyframeCloud, &keyPoses6DCopy->points[i]);
+        }
+        pcl::io::savePCDFileBinary(savePCDDirectory + "cloudGlobal.pcd", *globalMapCloud);
+
+        std::ofstream g2o_file(savePCDDirectory + "global_graph.g2o");
+        if (!g2o_file.is_open())
+        {
+            ROS_ERROR_STREAM("Failed to open g2o file in '" << savePCDDirectory << "'.");
+            return;
+        }
+
+        for (size_t i = 0; i < num_keyframes; ++i)
+            writeG2OVertex(g2o_file, static_cast<int>(i), pclPointTogtsamPose3(transformationsCopy->points[i]));
+
+        for (size_t i = 1; i < num_keyframes; ++i)
+        {
+            const gtsam::Pose3 prev_pose = pclPointTogtsamPose3(transformationsCopy->points[i - 1]);
+            const gtsam::Pose3 cur_pose = pclPointTogtsamPose3(transformationsCopy->points[i]);
+            writeG2OEdge(g2o_file, static_cast<int>(i - 1), static_cast<int>(i), prev_pose.between(cur_pose));
+        }
+
+        for (const auto &loop_pair : loopIndexContainerCopy)
+        {
+            const int key_cur = loop_pair.first;
+            const int key_pre = loop_pair.second;
+            if (key_cur < 0 || key_pre < 0 ||
+                key_cur >= static_cast<int>(num_keyframes) ||
+                key_pre >= static_cast<int>(num_keyframes))
+            {
+                continue;
+            }
+            const gtsam::Pose3 pose_cur = pclPointTogtsamPose3(transformationsCopy->points[key_cur]);
+            const gtsam::Pose3 pose_pre = pclPointTogtsamPose3(transformationsCopy->points[key_pre]);
+            writeG2OEdge(g2o_file, key_cur, key_pre, pose_cur.between(pose_pre));
+        }
+
+        for (const auto &prior_pair : priorVisContainerCopy)
+        {
+            const int key_cur = prior_pair.first;
+            const int key_linked = prior_pair.second.first;
+            if (key_cur < 0 || key_linked < 0 ||
+                key_cur >= static_cast<int>(num_keyframes) ||
+                key_linked >= static_cast<int>(num_keyframes))
+            {
+                continue;
+            }
+
+            const gtsam::Pose3 linked_pose_gtsam = pclPointTogtsamPose3(transformationsCopy->points[key_linked]);
+            const gtsam::Pose3 current_pose_gtsam = pclPointTogtsamPose3(transformationsCopy->points[key_cur]);
+            writeG2OEdge(g2o_file, key_linked, key_cur, linked_pose_gtsam.between(current_pose_gtsam));
+        }
+
+        cout << "Saved global outputs to " << savePCDDirectory << endl;
     }
 
     //! 对关键帧状态降采样，并融合特征点云组成全局地图，最后发布ROS消息
@@ -1819,13 +1934,15 @@ public:
 
     void performPriorAssociation()
     {
-        printf("Prior pose size: %d\n", priorPosePatchHistory.size());
+        // priorFilter();
+
+        printf("Prior pose size: %zu\n", priorPosePatchHistory.size());
         if (cloudKeyPoses6D->points.empty() || priorPosePatchHistory.empty())
             return;
 
         pcl::PointCloud<PointTypePose>::Ptr copy_KeyPoses6D;
         copy_KeyPoses6D.reset(new pcl::PointCloud<PointTypePose>());
-        std::deque<std::pair<std::array<double, 6>, pcl::PointCloud<PointType>>> copy_priorPosePatchHistory;
+        std::deque<std::pair<std::array<double, 6>, pcl::PointCloud<GroundPatchType>>> copy_priorPosePatchHistory;
         std::deque<std::pair<double, int>> copy_priorTimeKeyQueue;
         mtx.lock();
         // 防止线程抢占资源
@@ -1858,8 +1975,8 @@ public:
             if (prior_dist < nearPriorRadius)
             {
                 // 匹配成功
-                pcl::PointCloud<PointType>::Ptr source_patch(new pcl::PointCloud<PointType>(pose_patch_iterator->second));
-                pcl::PointCloud<PointType>::Ptr target_patch(new pcl::PointCloud<PointType>());
+                pcl::PointCloud<GroundPatchType>::Ptr source_patch(new pcl::PointCloud<GroundPatchType>(pose_patch_iterator->second));
+                pcl::PointCloud<GroundPatchType>::Ptr target_patch(new pcl::PointCloud<GroundPatchType>());
                 mtx.lock();
                 *target_patch = *GroundCloudFromlaser;
                 mtx.unlock();
@@ -1903,7 +2020,7 @@ public:
                     // Eigen::Matrix4d prior_patch_transform = vgicp_result.T_target_source.matrix();
                     // double prior_fitness_score = vgicp_result.error;
 
-                    static pcl::IterativeClosestPoint<PointType, PointType> prior_icp;
+                    static pcl::IterativeClosestPoint<GroundPatchType, GroundPatchType> prior_icp;
                     prior_icp.setMaxCorrespondenceDistance(groundPatchSize);
                     prior_icp.setMaximumIterations(100);
                     prior_icp.setTransformationEpsilon(1e-6);
@@ -1912,7 +2029,7 @@ public:
                     prior_icp.setInputSource(source_patch);
                     prior_icp.setInputTarget(target_patch);
 
-                    pcl::PointCloud<PointType>::Ptr aligned_prior_patch(new pcl::PointCloud<PointType>());
+                    pcl::PointCloud<GroundPatchType>::Ptr aligned_prior_patch(new pcl::PointCloud<GroundPatchType>());
                     prior_icp.align(*aligned_prior_patch);
 
                     const bool prior_icp_converged = prior_icp.hasConverged();
@@ -2068,17 +2185,72 @@ public:
         mtx.unlock();
     }
 
+    Eigen::Affine3f priorLidarPoseToBodyPose(const Eigen::Affine3f &lidar_pose) const
+    {
+        return lidar_pose * Eigen::Affine3f(priorVehicleModel.lidar_to_body());
+    }
+
+    jsk_recognition_msgs::BoundingBox buildPriorBoundingBox(const Eigen::Affine3f &global_prior_lidar_pose,
+                                                            int linked_key_id,
+                                                            const ros::Time &stamp) const
+    {
+        jsk_recognition_msgs::BoundingBox bbox;
+        bbox.header.frame_id = odometryFrame;
+        bbox.header.stamp = stamp;
+        bbox.label = linked_key_id;
+
+        const Eigen::Affine3f global_body_pose = priorLidarPoseToBodyPose(global_prior_lidar_pose);
+        const auto &wheel_points_body = priorVehicleModel.wheel_points_body();
+
+        float min_x = std::numeric_limits<float>::max();
+        float max_x = std::numeric_limits<float>::lowest();
+        float min_y = std::numeric_limits<float>::max();
+        float max_y = std::numeric_limits<float>::lowest();
+        for (const auto &wheel_point : wheel_points_body)
+        {
+            min_x = std::min(min_x, static_cast<float>(wheel_point.x()));
+            max_x = std::max(max_x, static_cast<float>(wheel_point.x()));
+            min_y = std::min(min_y, static_cast<float>(wheel_point.y()));
+            max_y = std::max(max_y, static_cast<float>(wheel_point.y()));
+        }
+
+        if (!std::isfinite(min_x) || !std::isfinite(max_x) || !std::isfinite(min_y) || !std::isfinite(max_y))
+        {
+            min_x = -static_cast<float>(0.5 * priorVehicleSizeX);
+            max_x = static_cast<float>(0.5 * priorVehicleSizeX);
+            min_y = -static_cast<float>(0.5 * priorVehicleSizeY);
+            max_y = static_cast<float>(0.5 * priorVehicleSizeY);
+        }
+
+        const float height = std::max(static_cast<float>(priorVehicleComZ), 0.1f);
+        const Eigen::Affine3f box_pose = global_body_pose * Eigen::Translation3f(
+            0.5f * (min_x + max_x),
+            0.5f * (min_y + max_y),
+            -0.5f * height);
+
+        bbox.pose.position.x = box_pose.translation().x();
+        bbox.pose.position.y = box_pose.translation().y();
+        bbox.pose.position.z = box_pose.translation().z();
+        Eigen::Quaternionf q_box(box_pose.rotation());
+        bbox.pose.orientation.x = q_box.x();
+        bbox.pose.orientation.y = q_box.y();
+        bbox.pose.orientation.z = q_box.z();
+        bbox.pose.orientation.w = q_box.w();
+        bbox.dimensions.x = std::max(max_x - min_x, 0.1f);
+        bbox.dimensions.y = std::max(max_y - min_y, 0.1f);
+        bbox.dimensions.z = height;
+
+        return bbox;
+    }
+
     void visualizePrior()
     {
-        visualization_msgs::MarkerArray marker_array;
-        visualization_msgs::Marker clear_marker;
-        clear_marker.header.frame_id = odometryFrame;
-        clear_marker.header.stamp = timeLaserInfoStamp;
-        clear_marker.action = visualization_msgs::Marker::DELETEALL;
-        marker_array.markers.push_back(clear_marker);
+        jsk_recognition_msgs::BoundingBoxArray box_array;
+        box_array.header.frame_id = odometryFrame;
+        box_array.header.stamp = timeLaserInfoStamp;
 
         pcl::PointCloud<PointTypePose>::Ptr copy_KeyPoses6D(new pcl::PointCloud<PointTypePose>());
-        std::deque<std::pair<std::array<double, 6>, pcl::PointCloud<PointType>>> copy_priorPosePatchHistory;
+        std::deque<std::pair<std::array<double, 6>, pcl::PointCloud<GroundPatchType>>> copy_priorPosePatchHistory;
         std::deque<std::pair<double, int>> copy_priorTimeKeyQueue;
         mtx.lock();
         *copy_KeyPoses6D = *cloudKeyPoses6D;
@@ -2086,8 +2258,7 @@ public:
         copy_priorTimeKeyQueue = priorTimeKeyQueue;
         mtx.unlock();
 
-        pcl::PointCloud<PointType>::Ptr stacked_prior_patches(new pcl::PointCloud<PointType>());
-        int prior_id = 0;
+        pcl::PointCloud<GroundPatchType>::Ptr stacked_prior_patches(new pcl::PointCloud<GroundPatchType>());
         auto pose_patch_iterator = copy_priorPosePatchHistory.cbegin();
         auto time_key_iterator = copy_priorTimeKeyQueue.cbegin();
         while (pose_patch_iterator != copy_priorPosePatchHistory.cend() &&
@@ -2098,7 +2269,6 @@ public:
             {
                 ++pose_patch_iterator;
                 ++time_key_iterator;
-                ++prior_id;
                 continue;
             }
 
@@ -2108,35 +2278,9 @@ public:
                 prior_pose[3], prior_pose[4], prior_pose[5],
                 prior_pose[0], prior_pose[1], prior_pose[2]);
             Eigen::Affine3f global_prior_pose = linked_key_pose * relative_prior_pose;
+            box_array.boxes.push_back(buildPriorBoundingBox(global_prior_pose, linked_key_id, timeLaserInfoStamp));
 
-            Eigen::Affine3f box_pose = global_prior_pose;
-            box_pose.translation() += global_prior_pose.rotation() * Eigen::Vector3f(0.0f, 0.0f, priorVehicleComZ);
-
-            visualization_msgs::Marker pose_marker;
-            pose_marker.header.frame_id = odometryFrame;
-            pose_marker.header.stamp = timeLaserInfoStamp;
-            pose_marker.ns = "prior_pose_boxes";
-            pose_marker.id = prior_id;
-            pose_marker.action = visualization_msgs::Marker::ADD;
-            pose_marker.type = visualization_msgs::Marker::CUBE;
-            pose_marker.pose.position.x = box_pose.translation().x();
-            pose_marker.pose.position.y = box_pose.translation().y();
-            pose_marker.pose.position.z = box_pose.translation().z();
-            Eigen::Quaternionf q_box(box_pose.rotation());
-            pose_marker.pose.orientation.x = q_box.x();
-            pose_marker.pose.orientation.y = q_box.y();
-            pose_marker.pose.orientation.z = q_box.z();
-            pose_marker.pose.orientation.w = q_box.w();
-            pose_marker.scale.x = priorVehicleSizeX;
-            pose_marker.scale.y = priorVehicleSizeY;
-            pose_marker.scale.z = std::max(2.0f * priorVehicleComZ, 0.1f);
-            pose_marker.color.r = 0.2;
-            pose_marker.color.g = 0.6; 
-            pose_marker.color.b = 0.9; 
-            pose_marker.color.a = 0.7;
-            marker_array.markers.push_back(pose_marker);
-
-            pcl::PointCloud<PointType> global_patch;
+            pcl::PointCloud<GroundPatchType> global_patch;
             pcl::transformPointCloud(pose_patch_iterator->second, global_patch, global_prior_pose);
             // for (auto &pt : global_patch.points)
             // {
@@ -2146,10 +2290,9 @@ public:
 
             ++pose_patch_iterator;
             ++time_key_iterator;
-            ++prior_id;
         }
 
-        pubPriorPredictions.publish(marker_array);
+        pubPriorPredictions.publish(box_array);
         publishCloud(pubPriorPatches, stacked_prior_patches, timeLaserInfoStamp, odometryFrame);
     }
 

@@ -10,6 +10,7 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <jsk_recognition_msgs/BoundingBoxArray.h>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
 #include <visualization_msgs/Marker.h>
@@ -17,8 +18,6 @@
 #include <geometry_msgs/PoseStamped.h>
 
 // #include <opencv/cv.h>
-
-
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/search/impl/search.hpp>
@@ -66,6 +65,79 @@ using namespace std;
 typedef pcl::PointXYZI PointType;
 
 enum class lidarType { VELODYNE, OUSTER };
+
+struct EIGEN_ALIGN16 GroundPatchType
+{
+    PCL_ADD_POINT4D;
+    float intensity;
+    float timestamp;
+    uint8_t label;
+
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    inline GroundPatchType()
+    {
+      x = y = z = timestamp = 0.0f;
+      intensity = 0.0f;
+      label = 0;
+    }
+};
+
+POINT_CLOUD_REGISTER_POINT_STRUCT(GroundPatchType,
+	(float,x,x)
+	(float,y,y)
+	(float,z,z)
+	(float,intensity,intensity)
+	(float,timestamp,timestamp)
+	(uint8_t,label,label)
+)
+
+inline Eigen::Vector3d LoadVector3Param(ros::NodeHandle &nh, const std::string &name,
+                                        const Eigen::Vector3d &fallback)
+{
+    std::vector<double> raw;
+    nh.param<std::vector<double>>(name, raw, std::vector<double>());
+    if (raw.size() != 3)
+        return fallback;
+    return Eigen::Map<const Eigen::Matrix<double, 3, 1>>(raw.data());
+}
+
+inline Eigen::Matrix3d LoadMatrix3Param(ros::NodeHandle &nh, const std::string &name,
+                                        const Eigen::Matrix3d &fallback)
+{
+    std::vector<double> raw;
+    nh.param<std::vector<double>>(name, raw, std::vector<double>());
+    if (raw.size() != 9)
+        return fallback;
+    return Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(raw.data());
+}
+
+inline std::vector<Eigen::Vector2d> LoadVector2ArrayParam(ros::NodeHandle &nh, const std::string &name)
+{
+    std::vector<double> raw;
+    nh.param<std::vector<double>>(name, raw, std::vector<double>());
+    std::vector<Eigen::Vector2d> values;
+    if (raw.empty() || raw.size() % 2 != 0)
+        return values;
+
+    values.reserve(raw.size() / 2);
+    for (size_t i = 0; i < raw.size(); i += 2)
+        values.emplace_back(raw[i], raw[i + 1]);
+    return values;
+}
+
+inline std::vector<Eigen::Vector3d> LoadVector3ArrayParam(ros::NodeHandle &nh, const std::string &name)
+{
+    std::vector<double> raw;
+    nh.param<std::vector<double>>(name, raw, std::vector<double>());
+    std::vector<Eigen::Vector3d> values;
+    if (raw.empty() || raw.size() % 3 != 0)
+        return values;
+
+    values.reserve(raw.size() / 3);
+    for (size_t i = 0; i < raw.size(); i += 3)
+        values.emplace_back(raw[i], raw[i + 1], raw[i + 2]);
+    return values;
+}
 
 class ParamLoader
 {
@@ -146,13 +218,50 @@ public:
     float priorRotDiffTolerance;
     float priorTransDiffTolerance;
     float priorFactorWeight;
+    float priorSyncedInterval;
+
+    // Prior pose node
+    std::string priorPoseNodePcdTopic;
+    std::string priorPoseNodePoseTopic;
+    std::string priorPoseNodePoseCovTopic;
+    std::string priorPoseNodeFrameId;
+    std::string priorPoseNodeChildFrameId;
+    std::string priorPoseNodeMeshResource;
+    double priorPoseNodeMarkerScale;
+    double priorVehicleSizeXY;
+    double priorVehicleComZ;
+    double priorKSpring;
+    double priorGravity;
+    int priorMaxIters;
+    double priorLmLambda;
+    double priorTolCost;
+    double priorTolStep;
+    double priorGroundAvgRadius;
+    int priorGroundMinNeighbors;
+    double priorToleranceZMin;
+    double priorToleranceZMax;
+    double priorToleranceRoll;
+    double priorTolerancePitch;
+    double priorToleranceWheelDistance;
+    bool priorPublishTF;
+    bool priorPublishModelMarker;
+    double priorModelMarkerWidth;
+    bool priorVerbose;
+    Eigen::Vector3d priorLidarOffsetTrans;
+    Eigen::Matrix3d priorLidarOffsetRot;
+    Eigen::Vector3d priorMeshOffset;
+    Eigen::Vector3d priorMeshRPY;
+    std::vector<Eigen::Vector2d> priorWheelXY;
+    std::vector<Eigen::Vector3d> priorMeshWheelPoints;
+    double priorVehicleSizeX;
+    double priorVehicleSizeY;
 
     // global map visualization radius
     float globalMapVisualizationSearchRadius;
     float globalMapVisualizationPoseDensity;
     float globalMapVisualizationLeafSize;
     // 载入param参数
-    ParamLoader()
+    ParamLoader(bool requireSensorConfig = true)
     {
         nh.param<std::string>("/robot_id", robot_id, "roboat");
 
@@ -168,7 +277,7 @@ public:
         nh.param<std::string>("rolo/savePCDDirectory", savePCDDirectory, "/Downloads/LOAM/");
 
         std::string sensorStr;
-        nh.param<std::string>("rolo/sensor", sensorStr, "");
+        nh.param<std::string>("rolo/sensor", sensorStr, requireSensorConfig ? "" : "velodyne");
         if (sensorStr == "velodyne")
         {
             sensor = lidarType::VELODYNE;
@@ -183,9 +292,16 @@ public:
         // }
         else
         {
-            ROS_ERROR_STREAM(
-                "Invalid sensor type (must be either 'velodyne' or 'ouster' or 'livox'): " << sensorStr);
-            ros::shutdown();
+            if (requireSensorConfig)
+            {
+                ROS_ERROR_STREAM(
+                    "Invalid sensor type (must be either 'velodyne' or 'ouster' or 'livox'): " << sensorStr);
+                ros::shutdown();
+            }
+            else
+            {
+                sensor = lidarType::VELODYNE;
+            }
         }
 
         nh.param<int>("rolo/N_SCAN", N_SCAN, 16);
@@ -254,6 +370,60 @@ public:
         priorRotDiffTolerance = priorRotDiffTolerance * M_PI / 180.0f;
         nh.param<float>("prior_factor/priorTransDiffTolerance", priorTransDiffTolerance, 1.0);
         nh.param<float>("prior_factor/priorFactorWeight", priorFactorWeight, 100.0);
+        nh.param<float>("prior_factor/priorSyncedInterval", priorSyncedInterval, 0.0f);
+
+        nh.param<std::string>("prior_pose_node/pcd_topic", priorPoseNodePcdTopic, "/voxel_map");
+        nh.param<std::string>("prior_pose_node/pose_topic", priorPoseNodePoseTopic, "/predicted_pose");
+        nh.param<std::string>("prior_pose_node/pose_cov_topic", priorPoseNodePoseCovTopic, "/initialpose");
+        nh.param<std::string>("prior_pose_node/frame_id", priorPoseNodeFrameId, "map");
+        nh.param<std::string>("prior_pose_node/child_frame_id", priorPoseNodeChildFrameId, "vehicle");
+        nh.param<std::string>("prior_pose_node/mesh_resource", priorPoseNodeMeshResource, "package://rolo/resource/meshes/vehicle.dae");
+        nh.param<double>("prior_pose_node/marker_scale", priorPoseNodeMarkerScale, 1.0);
+        nh.param<double>("prior_pose_node/vehicle_size_xy", priorVehicleSizeXY, 2.0);
+        nh.param<double>("prior_pose_node/vehicle_com_z", priorVehicleComZ, 1.0);
+        nh.param<double>("prior_pose_node/k_spring", priorKSpring, 20.0);
+        nh.param<double>("prior_pose_node/g", priorGravity, 1.0);
+        nh.param<int>("prior_pose_node/max_iters", priorMaxIters, 60);
+        nh.param<double>("prior_pose_node/lm_lambda", priorLmLambda, 1e-2);
+        nh.param<double>("prior_pose_node/tol_cost", priorTolCost, 1e-12);
+        nh.param<double>("prior_pose_node/tol_step", priorTolStep, 1e-10);
+        nh.param<double>("prior_pose_node/ground_avg_radius", priorGroundAvgRadius, 0.3);
+        nh.param<int>("prior_pose_node/ground_min_neighbors", priorGroundMinNeighbors, 5);
+        nh.param<double>("prior_pose_node/tolerance_z_min", priorToleranceZMin, -10.0);
+        nh.param<double>("prior_pose_node/tolerance_z_max", priorToleranceZMax, 10.0);
+        nh.param<double>("prior_pose_node/tolerance_roll", priorToleranceRoll, 1.0);
+        nh.param<double>("prior_pose_node/tolerance_pitch", priorTolerancePitch, 1.0);
+        nh.param<double>("prior_pose_node/tolerance_wheel_distance", priorToleranceWheelDistance, 1.0);
+        nh.param<bool>("prior_pose_node/publish_tf", priorPublishTF, true);
+        nh.param<bool>("prior_pose_node/publish_model_marker", priorPublishModelMarker, true);
+        nh.param<double>("prior_pose_node/model_marker_width", priorModelMarkerWidth, 0.05);
+        nh.param<bool>("prior_pose_node/verbose", priorVerbose, false);
+
+        priorWheelXY = LoadVector2ArrayParam(nh, "prior_pose_node/wheel_xy");
+        priorMeshWheelPoints = LoadVector3ArrayParam(nh, "prior_pose_node/mesh_wheel_points");
+        priorLidarOffsetTrans = LoadVector3Param(nh, "prior_pose_node/lidarOffsetTrans", Eigen::Vector3d::Zero());
+        priorLidarOffsetRot = LoadMatrix3Param(nh, "prior_pose_node/lidarOffsetRot", Eigen::Matrix3d::Identity());
+        priorMeshOffset = LoadVector3Param(nh, "prior_pose_node/mesh_offset", Eigen::Vector3d::Zero());
+        priorMeshRPY = LoadVector3Param(nh, "prior_pose_node/mesh_rpy", Eigen::Vector3d::Zero());
+
+        priorVehicleSizeX = std::max(priorVehicleSizeXY, 0.1);
+        priorVehicleSizeY = std::max(priorVehicleSizeXY, 0.1);
+        if (!priorWheelXY.empty())
+        {
+            double min_x = std::numeric_limits<double>::max();
+            double max_x = std::numeric_limits<double>::lowest();
+            double min_y = std::numeric_limits<double>::max();
+            double max_y = std::numeric_limits<double>::lowest();
+            for (const auto &xy : priorWheelXY)
+            {
+                min_x = std::min(min_x, xy.x());
+                max_x = std::max(max_x, xy.x());
+                min_y = std::min(min_y, xy.y());
+                max_y = std::max(max_y, xy.y());
+            }
+            priorVehicleSizeX = std::max(max_x - min_x, 0.1);
+            priorVehicleSizeY = std::max(max_y - min_y, 0.1);
+        }
 
         nh.param<float>("rolo/globalMapVisualizationSearchRadius", globalMapVisualizationSearchRadius, 1e3);
         nh.param<float>("rolo/globalMapVisualizationPoseDensity", globalMapVisualizationPoseDensity, 10.0);
@@ -281,23 +451,23 @@ double GET_ROS_TIMESTAMP(T msg)
     return msg->header.stamp.toSec();
 }
 
-double radTodeg(double radians)
+inline double radTodeg(double radians)
 {
   return radians * 180.0 / M_PI;
 }
 
-double degTorad(double degrees)
+inline double degTorad(double degrees)
 {
   return degrees * M_PI / 180.0;
 }
 
-float pointDistance(PointType p)
+inline float pointDistance(PointType p)
 {
     return sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
 }
 
 
-float pointDistance(PointType p1, PointType p2)
+inline float pointDistance(PointType p1, PointType p2)
 {
     return sqrt((p1.x-p2.x)*(p1.x-p2.x) + (p1.y-p2.y)*(p1.y-p2.y) + (p1.z-p2.z)*(p1.z-p2.z));
 }
