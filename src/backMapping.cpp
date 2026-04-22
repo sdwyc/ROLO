@@ -1859,8 +1859,9 @@ public:
             const auto &poseCur = graphKeyPoses->points[keyCur];
             const auto &poseLinked = graphKeyPoses->points[keyLinked];
             const Eigen::Affine3f linkedPoseAffine = pclPointToAffine3f(poseLinked);
+            const Eigen::Vector3f prior_offset{0.0, 0.0, priorVehicleComZ}; 
             const Eigen::Affine3f relativePriorPose = pcl::getTransformation(
-                relativePriorPoseArray[3], relativePriorPoseArray[4], relativePriorPoseArray[5],
+                relativePriorPoseArray[3]+prior_offset(0), relativePriorPoseArray[4]+prior_offset(1), relativePriorPoseArray[5]+prior_offset(2),
                 relativePriorPoseArray[0], relativePriorPoseArray[1], relativePriorPoseArray[2]);
             const Eigen::Affine3f globalPriorPose = linkedPoseAffine * relativePriorPose;
 

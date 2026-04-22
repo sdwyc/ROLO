@@ -73,6 +73,7 @@ public:
   virtual ~RotVGICP() override;
 
   void setResolution(double resolution);
+  void setPolarResolution(double theta_res, double phi_res, double r_res);
   void setVoxelAccumulationMode(VoxelAccumulationMode mode);
   void setNeighborSearchMethod(NeighborSearchMethod method);
 
@@ -119,9 +120,11 @@ protected:
 
 protected:
   double voxel_resolution_;
+  Eigen::Vector3d polar_resolution_;
   float lambda_;
   NeighborSearchMethod search_method_;
   VoxelAccumulationMode voxel_mode_;
+  VoxelType voxel_type_;
 
   std::unique_ptr<VmfVoxelMap<PointTarget>> voxelmap_;
 

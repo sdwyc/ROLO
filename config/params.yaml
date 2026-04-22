@@ -53,8 +53,8 @@ rolo:
   surroundingKeyframeSearchRadius: 50.0         # meters, within n meters scan-to-map optimization (when loop closure disabled) 关键帧的搜索范围阈值
 
   # Loop closure
-  loopClosureEnableFlag: false
-  loopCloseType: sc
+  loopClosureEnableFlag: true
+  loopCloseType: rs
   scInputType: scan_raw
   loopClosureFrequency: 1.0                     # Hz, regulate loop closure constraint add frequency
   surroundingKeyframeSize: 50                   # submap size (when loop closure enabled)

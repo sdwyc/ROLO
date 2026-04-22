@@ -1,6 +1,7 @@
 #ifndef VMP_VOXEL_HPP
 #define VMP_VOXEL_HPP
 
+#include <cmath>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <unordered_map>
@@ -77,6 +78,7 @@ public:
 public:
   int num_points;
   Eigen::Vector4d mean_dir; // 栅格内点云的质心
+  Eigen::Vector4d dir_reg; // normalization
   double r_bar;
   double kappa;
   Eigen::Matrix4d cov;
@@ -98,13 +100,10 @@ public:
   
   virtual void finalize() override {
     mean_dir /= num_points;
-    // mean_dir(3) = 1;
-    if(r_bar < 1 || r_bar > 1.732051){  // avoid Nan
-      kappa = r_bar * (3-r_bar*r_bar) / (1-r_bar*r_bar);
-    }
-    else{
-      kappa = 3*r_bar*(1 + 0.6*pow(r_bar, 2) + 99.0/175.0 * pow(r_bar, 4));
-    }
+    dir_reg = mean_dir / mean_dir.norm();
+    if (r_bar < 1e-8) kappa = 0.0;
+    else if (r_bar < 0.6)  kappa = 3.0 * r_bar * (1.0 + 0.6 * pow(r_bar, 2) + 99.0 / 175.0 * pow(r_bar, 4));
+    else kappa = r_bar * (3.0 - pow(r_bar, 2)) / (1.0 - pow(r_bar, 2));
     cov /= num_points;
   }
 };
@@ -158,12 +157,18 @@ public:
 template<typename PointT>
 class VmfVoxelMap {
 public:
-  VmfVoxelMap(double resolution, VoxelAccumulationMode mode) : voxel_resolution_(resolution), voxel_mode_(mode) {}
+  VmfVoxelMap(double resolution, VoxelAccumulationMode mode, VoxelType type = VoxelType::UNIFORM)
+  : VmfVoxelMap(resolution, Eigen::Vector3d::Constant(resolution), mode, type) {}
+
+  VmfVoxelMap(double resolution, Eigen::Vector3d polar_resolution, VoxelAccumulationMode mode, VoxelType type = VoxelType::POLAR)
+  : voxel_resolution_(resolution), polar_resolution_(polar_resolution), voxel_mode_(mode), voxel_type_(type) {}
+
   //! 为点云创建一个新的体素地图
   void create_voxelmap(const pcl::PointCloud<PointT>& cloud, const std::vector<Eigen::Matrix4d, Eigen::aligned_allocator<Eigen::Matrix4d>>& covs) {
     voxels_.clear();
     for(int i = 0; i < cloud.size(); i++) {
-      Eigen::Vector3i coord = voxel_coord(cloud.at(i).getVector4fMap().template cast<double>());
+      Eigen::Vector4d point = cloud.at(i).getVector4fMap().template cast<double>();
+      Eigen::Vector3i coord = voxel_type_ == VoxelType::POLAR ? polar_coord(point) : voxel_coord(point);
 
       auto found = voxels_.find(coord);
       // 未分配体素，则为其新分配一个体素
@@ -183,7 +188,7 @@ public:
       }
 
       auto& voxel = found->second; // 找到对应体素
-      voxel->append(cloud.at(i).getVector4fMap().template cast<double>(), covs[i]); // 存储的值进行更新
+      voxel->append(point, covs[i]); // 存储的值进行更新
     }
 
     for(auto& voxel : voxels_) {
@@ -200,6 +205,24 @@ public:
     return Eigen::Vector4d(origin[0], origin[1], origin[2], 1.0f);
   }
 
+  Eigen::Vector3i polar_coord(const Eigen::Vector4d& x) const {
+    double r = x.template head<3>().norm();
+    return (Eigen::Vector3d(std::atan2(x[1], x[0]) + M_PI, std::acos(x[2] / r), r).array() / polar_resolution_.array()).floor().template cast<int>();
+  }
+
+  Eigen::Vector4d polar_origin(const Eigen::Vector3i& coord) const {
+    Eigen::Vector3d polar = (coord.template cast<double>().array() + 0.5) * polar_resolution_.array();
+    double theta = polar[0] - M_PI;
+    double sin_phi = std::sin(polar[1]);
+
+    return Eigen::Vector4d(
+      polar[2] * sin_phi * std::cos(theta),
+      polar[2] * sin_phi * std::sin(theta),
+      polar[2] * std::cos(polar[1]),
+      1.0
+    );
+  }
+
   VmfVoxel::Ptr lookup_voxel(const Eigen::Vector3i& coord) const {
     auto found = voxels_.find(coord);
     if(found == voxels_.end()) {
@@ -211,7 +234,9 @@ public:
 
 private:
   double voxel_resolution_;
+  Eigen::Vector3d polar_resolution_;  // resolution for [theta (rad), phi (rad), r (m)]
   VoxelAccumulationMode voxel_mode_;
+  VoxelType voxel_type_;
 
   using VoxelMap = std::unordered_map<Eigen::Vector3i, VmfVoxel::Ptr, Vector3iHash, std::equal_to<Eigen::Vector3i>, Eigen::aligned_allocator<std::pair<const Eigen::Vector3i, VmfVoxel::Ptr>>>;
   VoxelMap voxels_;
