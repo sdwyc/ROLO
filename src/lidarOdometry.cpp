@@ -341,7 +341,8 @@ public:
         // 先平移插值，使中心对齐
         pcl::transformPointCloud(*featureOld, *feature_propagated, transformation_interpolated);
         fast_gicp::RotVGICP<PointType, PointType> rot_vgicp;
-        rot_vgicp.setResolution(1.0);
+        // rot_vgicp.setResolution(1.0);
+        rot_vgicp.setPolarResolution(0.175, 0.175, 2.0);
         rot_vgicp.setNumThreads(omp_get_max_threads());
         rot_vgicp.clearTarget();
         rot_vgicp.clearSource();

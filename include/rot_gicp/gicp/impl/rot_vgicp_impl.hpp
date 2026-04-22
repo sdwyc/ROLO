@@ -34,6 +34,8 @@ RotVGICP<PointSource, PointTarget>::RotVGICP() : LsqRegistration<PointSource, Po
   lambda_ = 1.0;
   search_method_ = NeighborSearchMethod::DIRECT1;
   voxel_mode_ = VoxelAccumulationMode::ADDITIVE;
+  voxel_type_ = VoxelType::POLAR;
+  polar_resolution_ = Eigen::Vector3d::Identity();
 }
 
 template <typename PointSource, typename PointTarget>
@@ -42,6 +44,15 @@ RotVGICP<PointSource, PointTarget>::~RotVGICP() {}
 template <typename PointSource, typename PointTarget>
 void RotVGICP<PointSource, PointTarget>::setResolution(double resolution) {
   voxel_resolution_ = resolution;
+  voxel_type_ = VoxelType::UNIFORM;
+  voxelmap_.reset();
+}
+
+template <typename PointSource, typename PointTarget>
+void RotVGICP<PointSource, PointTarget>::setPolarResolution(double theta_res, double phi_res, double r_res) {
+  polar_resolution_ << theta_res, phi_res, r_res;
+  voxel_type_ = VoxelType::POLAR;
+  voxelmap_.reset();
 }
 
 template <typename PointSource, typename PointTarget>
@@ -173,7 +184,7 @@ void RotVGICP<PointSource, PointTarget>::update_correspondences(const Eigen::Iso
   for (int i = 0; i < input_->size(); i++) {
     const Eigen::Vector4d mean_A = input_->at(i).getVector4fMap().template cast<double>();
     Eigen::Vector4d transed_mean_A = trans * mean_A;
-    Eigen::Vector3i coord = voxelmap_->voxel_coord(transed_mean_A); // 取体素索引
+    Eigen::Vector3i coord = voxel_type_ == VoxelType::POLAR ? voxelmap_->polar_coord(transed_mean_A) : voxelmap_->voxel_coord(transed_mean_A); // 取体素索引
 
     for (const auto& offset : offsets) {
       auto voxel = voxelmap_->lookup_voxel(coord + offset); // 寻找该点周围的体素
@@ -215,7 +226,7 @@ template <typename PointSource, typename PointTarget>
 double RotVGICP<PointSource, PointTarget>::linearize(const Eigen::Isometry3d& trans, Eigen::Matrix<double, 6, 6>* H, Eigen::Matrix<double, 6, 1>* b) {
   // 若没有构建体素地图，先构建体素地图
   if (voxelmap_ == nullptr) {
-    voxelmap_.reset(new VmfVoxelMap<PointTarget>(voxel_resolution_, voxel_mode_));
+    voxelmap_.reset(new VmfVoxelMap<PointTarget>(voxel_resolution_, polar_resolution_, voxel_mode_, voxel_type_));
     voxelmap_->create_voxelmap(*target_, target_covs_);
   }
 
@@ -283,7 +294,7 @@ template <typename PointSource, typename PointTarget>
 double RotVGICP<PointSource, PointTarget>::so3_linearize(const Eigen::Isometry3d& trans, Eigen::Matrix<double, 3, 3>* H, Eigen::Matrix<double, 3, 1>* b) {
   // 若没有构建体素地图，先构建体素地图
   if (voxelmap_ == nullptr) {
-    voxelmap_.reset(new VmfVoxelMap<PointTarget>(voxel_resolution_, voxel_mode_));
+    voxelmap_.reset(new VmfVoxelMap<PointTarget>(voxel_resolution_, polar_resolution_, voxel_mode_, voxel_type_));
     voxelmap_->create_voxelmap(*target_, target_covs_);
   }
   // std::cout << target_covs_.size() << std::endl;
@@ -306,24 +317,26 @@ double RotVGICP<PointSource, PointTarget>::so3_linearize(const Eigen::Isometry3d
     auto target_voxel = corr.second;
 
     const Eigen::Vector4d mean_A = input_->at(corr.first).getVector4fMap().template cast<double>();
+    Eigen::Vector4d mean_A_dir;
+    mean_A_dir << mean_A.head<3>().normalized(), 1.0;
     // std::cout << "mean_A" << mean_A << std::endl;
     const auto& cov_A = source_covs_[corr.first]; // 取协方差矩阵  
 
-    const Eigen::Vector4d mean_B = corr.second->mean_dir; // 体素栅格内的均值和协方差
-    // const Eigen::Vector4d dir_B = mean_B.array().acos(); // 取方向余弦
+    // const Eigen::Vector4d mean_B = corr.second->mean_dir; // 体素栅格内的均值和协方差
+    const Eigen::Vector4d mean_B_dir = corr.second->dir_reg; // 取方向余弦
     // const auto& cov_B = corr.second->cov;
 
-    const Eigen::Vector4d transed_mean_A = trans * mean_A; // 变换点
-    // const Eigen::Vector3d transed_so3_A = transed_mean_A.head<3>();
-    // Eigen::Vector4d dir_A = (transed_mean_A / transed_so3_A.norm()).array().acos();  // 取方向余弦
-    // dir_A(3) = 0.0;
+    const Eigen::Vector4d transed_mean_A = trans * mean_A_dir; // 变换点
+    // Eigen::Vector4d dir_A = (transed_mean_A / transed_so3_A.norm());
+    // dir_A(3) = 1.0;
     // std::cout << "dir_A" << dir_A << std::endl;  
     // std::cout << "dir_B" << dir_B << std::endl;  
 
-    // const Eigen::Vector4d error = dir_B - dir_A;
-    const Eigen::Vector4d error = mean_B - transed_mean_A; // 均值误差
+    const Eigen::Vector4d error = mean_B_dir - transed_mean_A;  // 旋转误差
+    // const Eigen::Vector4d error = mean_B - transed_mean_A; // 均值误差
 
-    double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
+    // double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
+    double w = target_voxel->kappa; // 体素内点越密集，权重越大
     sum_errors += w * error.transpose() * voxel_mahalanobis_[i] * error; // 残差计算
 
     if (H == nullptr || b == nullptr) {
@@ -388,15 +401,18 @@ double RotVGICP<PointSource, PointTarget>::compute_error(const Eigen::Isometry3d
     auto target_voxel = corr.second;
 
     const Eigen::Vector4d mean_A = input_->at(corr.first).getVector4fMap().template cast<double>();
+    Eigen::Vector4d mean_A_dir;
+    mean_A_dir << mean_A.head<3>().normalized(), 1.0;
     const auto& cov_A = source_covs_[corr.first]; // 取协方差矩阵  
 
-    const Eigen::Vector4d mean_B = corr.second->mean_dir; // 体素栅格内的均值和协方差
+    const Eigen::Vector4d mean_B_dir = corr.second->dir_reg; // 体素栅格内的均值和协方差
 
-    const Eigen::Vector4d transed_mean_A = trans * mean_A; // 变换点
+    const Eigen::Vector4d transed_mean_A = trans * mean_A_dir; // 变换点
 
-    const Eigen::Vector4d error = mean_B - transed_mean_A; // 均值误差
+    const Eigen::Vector4d error = mean_B_dir - transed_mean_A; // 均值误差
 
-    double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
+    // double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
+    double w = target_voxel->kappa; // 体素内点越密集，权重越大
     sum_errors += w * error.transpose() * voxel_mahalanobis_[i] * error; // 残差计算
   }
 
