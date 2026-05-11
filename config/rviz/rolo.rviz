@@ -5,14 +5,10 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /Odometry1/Odom lidar1
-        - /Mapping1/FactorGraph1/Namespaces1
-        - /Prediction1/Covariance1
-        - /Prediction1/Covariance1/Position1
-        - /Prediction1/Covariance1/Orientation1
-        - /Prior_Predictions1
-      Splitter Ratio: 0.6797752976417542
-    Tree Height: 638
+        - /Mapping1/Loop constraint1/Namespaces1
+        - /PriorPose1/Segmented_ground1
+      Splitter Ratio: 0.5616045594215393
+    Tree Height: 611
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Views
@@ -39,7 +35,7 @@ Visualization Manager:
       Cell Size: 10
       Class: rviz/Grid
       Color: 211; 215; 207
-      Enabled: true
+      Enabled: false
       Line Style:
         Line Width: 0.029999999329447746
         Value: Lines
@@ -52,7 +48,7 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 100
       Reference Frame: <Fixed Frame>
-      Value: true
+      Value: false
     - Class: rviz/Group
       Displays:
         - Class: rviz/TF
@@ -219,7 +215,7 @@ Visualization Manager:
           Buffer Length: 1
           Class: rviz/Path
           Color: 85; 255; 255
-          Enabled: true
+          Enabled: false
           Head Diameter: 0.30000001192092896
           Head Length: 0.20000000298023224
           Length: 0.800000011920929
@@ -238,7 +234,7 @@ Visualization Manager:
           Shaft Length: 0.10000000149011612
           Topic: /odometry/lidar_incremental/path
           Unreliable: false
-          Value: true
+          Value: false
         - Alpha: 0.10000000149011612
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -267,7 +263,34 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: false
-      Enabled: false
+        - Buffer length: 100
+          Class: jsk_rviz_plugin/Plotter2D
+          Enabled: true
+          Name: Speed
+          Show Value: true
+          Topic: /odometry/lidar/speed
+          Value: true
+          auto color change: false
+          auto scale: true
+          auto text size in plot: true
+          background color: 0; 0; 0
+          backround alpha: 0.30000001192092896
+          border: true
+          foreground alpha: 0.699999988079071
+          foreground color: 255; 255; 0
+          height: 128
+          left: 10
+          linewidth: 2
+          max color: 255; 0; 0
+          max value: 1
+          min value: -1
+          show caption: true
+          text size: 12
+          text size in plot: 12
+          top: 10
+          update interval: 0.10000000149011612
+          width: 128
+      Enabled: true
       Name: Odometry
     - Class: rviz/Group
       Displays:
@@ -329,7 +352,7 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: false
-      Enabled: true
+      Enabled: false
       Name: Point Cloud
     - Class: rviz/Group
       Displays:
@@ -538,7 +561,7 @@ Visualization Manager:
           Head Length: 0.20000000298023224
           Length: 0.800000011920929
           Line Style: Billboards
-          Line Width: 0.25
+          Line Width: 0.10000000149011612
           Name: Path (local)
           Offset:
             X: 0
@@ -586,7 +609,8 @@ Visualization Manager:
           Marker Topic: /rolo/mapping/loop_closure_constraints
           Name: Loop constraint
           Namespaces:
-            {}
+            loop_edges: true
+            loop_nodes: true
           Queue Size: 100
           Value: true
         - Class: rviz/MarkerArray
@@ -594,9 +618,9 @@ Visualization Manager:
           Marker Topic: /rolo/mapping/global_graph
           Name: FactorGraph
           Namespaces:
-            global_graph_axes: true
+            global_graph_axes: false
             global_graph_edges: true
-            global_graph_factors: false
+            global_graph_factors: true
             global_graph_nodes: true
             global_graph_prior_axes: true
             global_graph_prior_pose: true
@@ -604,106 +628,142 @@ Visualization Manager:
           Value: true
       Enabled: true
       Name: Mapping
-    - Class: rviz/Image
-      Enabled: false
-      Image Topic: /rolo/range_image
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: range_image
-      Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
-      Unreliable: false
-      Value: false
-    - Angle Tolerance: 0.10000000149011612
-      Class: rviz/Odometry
-      Covariance:
-        Orientation:
-          Alpha: 0.8999999761581421
-          Color: 255; 255; 127
-          Color Style: Unique
-          Frame: Local
-          Offset: 1
-          Scale: 4
+    - Class: rviz/Group
+      Displays:
+        - Class: rviz_plugins/Path
+          Color Border Vel Max: 3
+          Enabled: true
+          Name: Path
+          Queue Size: 10
+          Topic: /future_path
+          Unreliable: false
           Value: true
-        Position:
-          Alpha: 0.800000011920929
-          Color: 204; 51; 204
-          Scale: 3
+          View Drivable Area:
+            Alpha: 0.9990000128746033
+            Color: 0; 148; 205
+            Value: false
+            Width: 0.30000001192092896
+          View Footprint:
+            Alpha: 1
+            Color: 230; 230; 50
+            Offset from BaseLink: 0
+            Rear Overhang: 0.10000000149011612
+            Value: false
+            Vehicle Length: 2
+            Vehicle Width: 1.8300000429153442
+          View Path:
+            Alpha: 0.5
+            Constant Width: true
+            Fade Out Distance: 5
+            Max Velocity Color: 0; 230; 120
+            Mid Velocity Color: 32; 138; 174
+            Min Velocity Color: 63; 46; 227
+            Value: true
+            Width: 1
+          View Point:
+            Alpha: 1
+            Color: 0; 60; 255
+            Offset: 1
+            Radius: 0.20000000298023224
+            Value: false
+          View Text Slope:
+            Scale: 0.30000001192092896
+            Value: false
+          View Text Velocity:
+            Scale: 0.30000001192092896
+            Value: false
+          View Velocity:
+            Alpha: 1
+            Color: 0; 0; 0
+            Constant Color: false
+            Scale: 0.30000001192092896
+            Value: false
+        - Alpha: 1
+          Axes Length: 1
+          Axes Radius: 0.10000000149011612
+          Class: rviz/PoseWithCovariance
+          Color: 255; 25; 0
+          Covariance:
+            Orientation:
+              Alpha: 0.5
+              Color: 255; 255; 127
+              Color Style: Unique
+              Frame: Local
+              Offset: 1
+              Scale: 1
+              Value: true
+            Position:
+              Alpha: 0.30000001192092896
+              Color: 204; 51; 204
+              Scale: 1
+              Value: true
+            Value: true
+          Enabled: true
+          Head Length: 0.30000001192092896
+          Head Radius: 0.10000000149011612
+          Name: PosePrediction
+          Queue Size: 10
+          Shaft Length: 1
+          Shaft Radius: 0.05000000074505806
+          Shape: Axes
+          Topic: /future_pose_lidar
+          Unreliable: false
           Value: true
-        Value: true
-      Enabled: false
-      Keep: 1
-      Name: Prediction
-      Position Tolerance: 0.10000000149011612
-      Queue Size: 10
-      Shape:
-        Alpha: 1
-        Axes Length: 1
-        Axes Radius: 0.10000000149011612
-        Color: 255; 25; 0
-        Head Length: 0.30000001192092896
-        Head Radius: 0.10000000149011612
-        Shaft Length: 1
-        Shaft Radius: 0.05000000074505806
-        Value: Axes
-      Topic: /fused_odom_future_local
-      Unreliable: false
-      Value: false
-    - Alpha: 0.6000000238418579
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz/PointCloud2
-      Color: 25; 255; 0
-      Color Transformer: FlatColor
-      Decay Time: 0
-      Enabled: false
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Min Color: 0; 0; 0
-      Name: Segmented_ground
-      Position Transformer: XYZ
-      Queue Size: 10
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.10000000149011612
-      Style: Boxes
-      Topic: /voxel_map
-      Unreliable: false
-      Use Fixed Frame: true
-      Use rainbow: false
-      Value: false
-    - Class: rviz/Marker
+        - Class: jsk_rviz_plugin/BoundingBoxArray
+          Enabled: true
+          Name: Prior_Predictions
+          Queue Size: 100
+          Topic: /rolo/mapping/prior_predictions
+          Unreliable: false
+          Value: true
+          alpha: 0.800000011920929
+          alpha max: 1
+          alpha method: flat
+          alpha min: 0
+          color: 25; 255; 0
+          coloring: Label
+          line width: 0.05000000074505806
+          only edge: true
+          show coords: true
+          value threshold: 0
+        - Alpha: 0.6000000238418579
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 10
+            Min Value: -10
+            Value: true
+          Axis: Z
+          Channel Name: intensity
+          Class: rviz/PointCloud2
+          Color: 25; 255; 0
+          Color Transformer: FlatColor
+          Decay Time: 0
+          Enabled: false
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Min Color: 0; 0; 0
+          Name: Segmented_ground
+          Position Transformer: XYZ
+          Queue Size: 10
+          Selectable: true
+          Size (Pixels): 2
+          Size (m): 0.10000000149011612
+          Style: Points
+          Topic: /voxel_map
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: false
+          Value: false
+        - Class: rviz/Marker
+          Enabled: true
+          Marker Topic: /vehicle_marker
+          Name: Prior_Pose
+          Namespaces:
+            prior_pose: true
+          Queue Size: 100
+          Value: true
       Enabled: true
-      Marker Topic: /vehicle_marker
-      Name: Prior_Pose
-      Namespaces:
-        prior_pose: true
-      Queue Size: 100
-      Value: true
-    - Class: jsk_rviz_plugin/BoundingBoxArray
-      Enabled: true
-      Name: Prior_Predictions
-      Queue Size: 100
-      Topic: /rolo/mapping/prior_predictions
-      Unreliable: false
-      Value: true
-      alpha: 0.800000011920929
-      alpha max: 1
-      alpha method: flat
-      alpha min: 0
-      color: 25; 255; 0
-      coloring: Label
-      line width: 0.05000000074505806
-      only edge: true
-      show coords: true
-      value threshold: 0
+      Name: PriorPose
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -748,7 +808,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 25.798324584960938
+      Distance: 33.51964569091797
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -756,25 +816,25 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 2.42767333984375
-        Y: -1.7993556261062622
-        Z: 0.41108107566833496
+        X: -0.03271552920341492
+        Y: -0.0146822240203619
+        Z: -0.010651597753167152
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.29479748010635376
+      Pitch: 0.37980103492736816
       Target Frame: base_link
-      Yaw: 2.451591730117798
+      Yaw: 4.021359920501709
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1043
+  Height: 1016
   Hide Left Dock: false
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd0000000400000000000001660000037afc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d0000037a000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730000000286000000a70000005c00fffffffb0000001600720061006e00670065005f0069006d00610067006502000005000000005700000280000001e0000000010000011100000320fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d00000320000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000780000000a9fc0100000002fb0000000a0049006d0061006700650100000000000007800000000000000000fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000078000000039fc0100000003fb0000000800540069006d0065010000000000000780000003bc00fffffffb0000000800540069006d00650000000000000004b00000000000000000fb0000000800540069006d00650100000000000004500000000000000000000006140000037a00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000015f0000035ffc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d0000035f000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730000000286000000a70000005c00fffffffb0000001600720061006e00670065005f0069006d00610067006502000005000000005700000280000001e0000000010000011100000320fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d00000320000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000780000000a9fc0100000002fb0000000a0049006d0061006700650100000000000007800000000000000000fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000073800000039fc0100000003fb0000000800540069006d0065010000000000000738000003bc00fffffffb0000000800540069006d00650000000000000004b00000000000000000fb0000000800540069006d00650100000000000004500000000000000000000005d30000035f00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -783,8 +843,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 1920
-  X: 3840
-  Y: 0
-  range_image:
-    collapsed: false
+  Width: 1848
+  X: 1992
+  Y: 27

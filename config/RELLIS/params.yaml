@@ -1,11 +1,11 @@
 rolo:
 
   # Topics
-  pointCloudTopic: "/velodyne_1/velodyne_points"               # Point cloud data
+  pointCloudTopic: "velodyne_points"               # Point cloud data
   odomTopic: "odometry/lidar"                   # Front end LiDAR odometry, same frequency as LiDAR pointcloud
 
   # Frames
-  lidarFrame: "velodyne_1"
+  lidarFrame: "velodyne"
   baselinkFrame: "base_link"
   odometryFrame: "odometry"
   mapFrame: "map"
@@ -54,7 +54,7 @@ rolo:
 
   # Loop closure
   loopClosureEnableFlag: true
-  loopCloseType: all
+  loopCloseType: rs
   scInputType: scan_raw
   loopClosureFrequency: 1.0                     # Hz, regulate loop closure constraint add frequency
   surroundingKeyframeSize: 50                   # submap size (when loop closure enabled)

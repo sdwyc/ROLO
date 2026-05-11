@@ -145,16 +145,16 @@ class PriorPoseNode : public ParamLoader {
       double pose_time = pose_msg.header.stamp.toSec();
       double time_diff = pose_time - odom_time;
       if (std::abs(time_diff) < 2e-2) {
-          // printf("Predicted pose synced...\n");
-          const geometry_msgs::PoseWithCovarianceStamped synced_pose = pose_msg;
-          pose_queue_.pop();
-          HandlePose(synced_pose.pose.pose, synced_pose.header.stamp);
-          return;
+        // printf("Predicted pose synced...\n");
+        const geometry_msgs::PoseWithCovarianceStamped synced_pose = pose_msg;
+        pose_queue_.pop();
+        HandlePose(synced_pose.pose.pose, synced_pose.header.stamp);
+        return;
       }
 
       if (time_diff < 0.0) {
-                pose_queue_.pop();
-                continue;
+        pose_queue_.pop();
+        continue;
       }
 
       return;

@@ -49,7 +49,7 @@ private:
     
     ros::Publisher pubExtractedCloud;
     ros::Publisher pubLaserCloudInfo;
-    ros::Publisher pubLaserRangeImg;
+    // ros::Publisher pubLaserRangeImg;
 
     std::deque<sensor_msgs::PointCloud2> cloudQueue;
     std::deque<nav_msgs::Odometry> odomQueue;
@@ -91,7 +91,7 @@ public:
         // 输出：cloud_info
         // cloud_info为从去畸变点云中提取的有效点云信息：行列数，距离和坐标，方便后续提取特征
         pubLaserCloudInfo = nh.advertise<rolo::CloudInfoStamp> ("rolo/cloud_info", 1);
-        pubLaserRangeImg = nh.advertise<sensor_msgs::Image> ("rolo/range_image", 1);
+        // pubLaserRangeImg = nh.advertise<sensor_msgs::Image> ("rolo/range_image", 1);
         // 重置各变量，初始化
         allocateMemory();
         resetParameters();
@@ -458,19 +458,19 @@ public:
             int index = columnIdn + rowIdn * Horizon_SCAN;
             fullCloud->points[index] = thisPoint;
         }
-        if(pubLaserRangeImg.getNumSubscribers()!=0){
-            cv::Mat rangeMatInit;
-            rangeMat.convertTo(rangeMatInit, CV_16UC1);
-            int row, col;
-            row = rangeMatInit.rows;
-            col = rangeMatInit.cols;
-            cv::resize(rangeMatInit, rangeMatInit, cv::Size(), 1.0, 10.0);
-            cv::flip(rangeMatInit, rangeMatInit, 0);
-            sensor_msgs::ImagePtr range_img = cv_bridge::CvImage(std_msgs::Header(), "mono16", rangeMatInit).toImageMsg();
-            range_img->header.frame_id = "camera";
-            range_img->header.stamp = ros::Time::now();
-            pubLaserRangeImg.publish(range_img);
-        }
+        // if(pubLaserRangeImg.getNumSubscribers()!=0){
+        //     cv::Mat rangeMatInit;
+        //     rangeMat.convertTo(rangeMatInit, CV_16UC1);
+        //     int row, col;
+        //     row = rangeMatInit.rows;
+        //     col = rangeMatInit.cols;
+        //     cv::resize(rangeMatInit, rangeMatInit, cv::Size(), 1.0, 10.0);
+        //     cv::flip(rangeMatInit, rangeMatInit, 0);
+        //     sensor_msgs::ImagePtr range_img = cv_bridge::CvImage(std_msgs::Header(), "mono16", rangeMatInit).toImageMsg();
+        //     range_img->header.frame_id = "camera";
+        //     range_img->header.stamp = ros::Time::now();
+        //     pubLaserRangeImg.publish(range_img);
+        // }
     }
 
     //! 对去畸变后的点云进行提取标记，方便后续提取特征，标记好每条扫瞄线的提取的点的行列和位置信息

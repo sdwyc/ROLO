@@ -12,6 +12,7 @@ if(DEFINED ENV{ROS_VERSION})
 endif()
 
 find_package(catkin REQUIRED COMPONENTS
+  autoware_rviz_msgs
   geometry_msgs
   jsk_recognition_msgs
   nav_msgs
@@ -122,6 +123,7 @@ catkin_package(
   DEPENDS PCL GTSAM
 
   CATKIN_DEPENDS
+  autoware_rviz_msgs
   std_msgs
   nav_msgs
   geometry_msgs
@@ -213,3 +215,7 @@ target_link_libraries(prior_pose_node
 ## Test executable
 add_executable(rotation_test test/rotation_test.cpp)
 target_link_libraries(rotation_test ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
+
+add_executable(eskf_odom_test test/eskf_odom_test.cpp)
+add_dependencies(eskf_odom_test ${PROJECT_NAME}_generate_messages_cpp)
+target_link_libraries(eskf_odom_test ${catkin_LIBRARIES})

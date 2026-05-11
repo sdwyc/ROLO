@@ -155,8 +155,7 @@ void RotVGICP<PointSource, PointTarget>::computeTransformation(PointCloudSource&
   }
   if (target_covs_.size() != target_->size()) {
     calculate_covariances(target_, *search_target_, target_covs_);
-  }
-
+  }  
   LsqRegistration<PointSource, PointTarget>::computeTransformation(output, guess);
 }
 
@@ -317,26 +316,22 @@ double RotVGICP<PointSource, PointTarget>::so3_linearize(const Eigen::Isometry3d
     auto target_voxel = corr.second;
 
     const Eigen::Vector4d mean_A = input_->at(corr.first).getVector4fMap().template cast<double>();
-    Eigen::Vector4d mean_A_dir;
-    mean_A_dir << mean_A.head<3>().normalized(), 1.0;
     // std::cout << "mean_A" << mean_A << std::endl;
     const auto& cov_A = source_covs_[corr.first]; // 取协方差矩阵  
 
-    // const Eigen::Vector4d mean_B = corr.second->mean_dir; // 体素栅格内的均值和协方差
-    const Eigen::Vector4d mean_B_dir = corr.second->dir_reg; // 取方向余弦
+    const Eigen::Vector4d mean_B = corr.second->mean_dir; // 体素栅格内的均值和协方差
     // const auto& cov_B = corr.second->cov;
+    const Eigen::Vector4d transed_mean_A = trans * mean_A; // 变换点
+    const Eigen::Vector4d error = mean_B - transed_mean_A; // 均值误差
 
-    const Eigen::Vector4d transed_mean_A = trans * mean_A_dir; // 变换点
-    // Eigen::Vector4d dir_A = (transed_mean_A / transed_so3_A.norm());
-    // dir_A(3) = 1.0;
-    // std::cout << "dir_A" << dir_A << std::endl;  
-    // std::cout << "dir_B" << dir_B << std::endl;  
+    // Eigen::Vector4d mean_A_dir;
+    // mean_A_dir << mean_A.head<3>().normalized(), 1.0;
+    // const Eigen::Vector4d mean_B_dir = corr.second->dir_reg; // 取方向余弦
+    // const Eigen::Vector4d transed_mean_A = trans * mean_A_dir; // 变换点
+    // const Eigen::Vector4d error = mean_B_dir - transed_mean_A;  // 旋转误差
 
-    const Eigen::Vector4d error = mean_B_dir - transed_mean_A;  // 旋转误差
-    // const Eigen::Vector4d error = mean_B - transed_mean_A; // 均值误差
-
-    // double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
-    double w = target_voxel->kappa; // 体素内点越密集，权重越大
+    double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
+    // double w = target_voxel->kappa; // 体素内点越密集，权重越大
     sum_errors += w * error.transpose() * voxel_mahalanobis_[i] * error; // 残差计算
 
     if (H == nullptr || b == nullptr) {
@@ -404,15 +399,17 @@ double RotVGICP<PointSource, PointTarget>::compute_error(const Eigen::Isometry3d
     Eigen::Vector4d mean_A_dir;
     mean_A_dir << mean_A.head<3>().normalized(), 1.0;
     const auto& cov_A = source_covs_[corr.first]; // 取协方差矩阵  
+    
+    // const Eigen::Vector4d mean_B_dir = corr.second->dir_reg; // 体素栅格内的均值和协方差
+    // const Eigen::Vector4d transed_mean_A = trans * mean_A_dir; // 变换点
+    // const Eigen::Vector4d error = mean_B_dir - transed_mean_A; // 均值误差
 
-    const Eigen::Vector4d mean_B_dir = corr.second->dir_reg; // 体素栅格内的均值和协方差
+    const Eigen::Vector4d mean_B = corr.second->mean_dir;
+    const Eigen::Vector4d transed_mean_A = trans * mean_A; // 变换点
+    const Eigen::Vector4d error = mean_B - transed_mean_A; // 均值误差
 
-    const Eigen::Vector4d transed_mean_A = trans * mean_A_dir; // 变换点
-
-    const Eigen::Vector4d error = mean_B_dir - transed_mean_A; // 均值误差
-
-    // double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
-    double w = target_voxel->kappa; // 体素内点越密集，权重越大
+    double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
+    // double w = target_voxel->kappa; // 体素内点越密集，权重越大
     sum_errors += w * error.transpose() * voxel_mahalanobis_[i] * error; // 残差计算
   }
 
@@ -551,6 +548,7 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
     const Eigen::Vector4d ct_error = (begin_mean_A - transed_mean_A)/interval_tn - last_transform/interval_tn_1;
 
     double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
+    // double w = target_voxel->kappa; // 体素内点越密集，权重越大
     const Eigen::Vector3d C_vel = (init_guess+trans)/interval_tn - last_t0/interval_tn_1;
     // double iter_error = w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda/pt_size * C_vel.transpose()*C_vel).value();
     // sum_errors += iter_error; // 残差计算
@@ -648,6 +646,7 @@ double RotVGICP<PointSource, PointTarget>::compute_t_error(const Eigen::Vector3d
     const Eigen::Vector4d ct_error = (begin_mean_A - transed_mean_A)/interval_tn - last_transform/interval_tn_1;
 
     double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
+    // double w = target_voxel->kappa; // 体素内点越密集，权重越大
     const Eigen::Vector3d C_vel = (init_guess+trans)/interval_tn - last_t0/interval_tn_1;
     // double iter_error = w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda/pt_size * C_vel.transpose()*C_vel).value();
     // sum_errors += iter_error; // 残差计算
