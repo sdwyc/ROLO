@@ -8,7 +8,7 @@
     <include file="$(find point_seg)/launch/ground_mapping.launch" />
 
     <rosparam command="load" file="$(arg param_file)" />
-    <node pkg="rolo" type="prior_pose_node" name="prior_pose_node" >
+    <node pkg="rolo" type="prior_pose_node" name="prior_pose_node">
         <param name="pcd_topic" value="$(arg pcd_topic)"/>
     </node>
 

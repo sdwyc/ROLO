@@ -1,0 +1,26 @@
+<launch>
+  <arg name="play_bag" default="true" />
+  <arg name="bag" default="$(find rolo)/resource/test_odom.bag" />
+  <arg name="input_topic" default="/odometry/lidar_incremental" />
+
+  <node pkg="rolo" type="eskf_odom_test" name="eskf_odom_test" output="screen">
+    <param name="input_topic" value="$(arg input_topic)" />
+    <param name="raw_odom_topic" value="/rolo/eskf/raw_odom" />
+    <param name="filtered_odom_topic" value="/rolo/eskf/filtered_odom" />
+    <param name="raw_path_topic" value="/rolo/eskf/raw_path" />
+    <param name="filtered_path_topic" value="/rolo/eskf/filtered_path" />
+    <param name="world_frame" value="odometry" />
+    <param name="child_frame" value="eskf_lidar" />
+    <param name="tf_parent_frame" value="odometry" />
+    <param name="raw_tf_child_frame" value="lidar_raw" />
+    <param name="filtered_tf_child_frame" value="lidar_filtered" />
+    <param name="use_input_covariance" value="true" />
+    <param name="max_dt" value="1.0" />
+    <param name="q_linear_jerk_std" value="0.5" />
+    <param name="q_angular_jerk_std" value="0.5" />
+    <param name="r_position_std" value="0.20" />
+    <param name="r_rotation_std" value="0.10" />
+  </node>
+
+  <node if="$(arg play_bag)" pkg="rosbag" type="play" name="play_test_odom" args="--clock $(arg bag)" />
+</launch>

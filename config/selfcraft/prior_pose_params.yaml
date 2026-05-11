@@ -17,13 +17,13 @@ prior_pose_node:
   vehicle_size_xy: 2.0
 
   vehicle_com_z: 1.0
-  wheel_xy: [-3.0046, 0.7836,   
-             0.8942, 0.7836,   
-             0.8942, -0.7836,   
-             -3.0046, -0.7836]  # [x1, y1, x2, y2, ...] in body frame
+  wheel_xy: [-0.747, 0.463,   
+             0.713, 0.463,   
+             0.747, -0.463,   
+             -0.713, -0.463]  # [x1, y1, x2, y2, ...] in body frame
   
   # Body frame (CoM) -> LiDAR frame
-  lidarOffsetTrans: [0, 0, 1.04]
+  lidarOffsetTrans: [0, 0, 0.94]
   lidarOffsetRot: [1, 0, 0,
                    0, 1, 0,
                    0, 0, 1]
@@ -62,4 +62,4 @@ prior_factor:
   priorRotDiffTolerance: 5.0 # deg
   priorTransDiffTolerance: 1.0 # m
   priorFactorWeight: 5000
-  priorSyncedInterval: 2.0
+  priorSyncedInterval: 1.0

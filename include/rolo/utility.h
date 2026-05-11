@@ -62,6 +62,9 @@
 #include <eigen3/Eigen/Dense>
 using namespace std;
 
+using PoseVector = Eigen::Matrix<double, 7, 1>;
+using PoseVectorList = std::vector<PoseVector, Eigen::aligned_allocator<PoseVector>>;
+
 typedef pcl::PointXYZI PointType;
 
 enum class lidarType { VELODYNE, OUSTER };
@@ -337,11 +340,6 @@ public:
         nh.param<bool>("rolo/loopClosureEnableFlag", loopClosureEnableFlag, true);
         nh.param<std::string>("rolo/loopCloseType", loopCloseType, "sc");
         std::transform(loopCloseType.begin(), loopCloseType.end(), loopCloseType.begin(), ::tolower);
-        if (loopCloseType != "sc" && loopCloseType != "rs")
-        {
-            ROS_WARN_STREAM("Invalid rolo/loopCloseType '" << loopCloseType << "', fallback to 'sc'.");
-            loopCloseType = "sc";
-        }
         nh.param<std::string>("rolo/scInputType", scInputType, "scan_raw");
         std::transform(scInputType.begin(), scInputType.end(), scInputType.begin(), ::tolower);
         if (scInputType == "raw")

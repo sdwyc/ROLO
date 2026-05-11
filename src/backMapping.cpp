@@ -471,7 +471,7 @@ public:
         if (latestKeyID < 0)
             return;
 
-        printf("time diff: %f \n", std::abs(msgIn->header.stamp.toSec() - latestKeyTime));
+        // printf("time diff: %f \n", std::abs(msgIn->header.stamp.toSec() - latestKeyTime));
         if (latestKeyID <= 9 || std::abs(msgIn->header.stamp.toSec() - latestKeyTime) >= 1e-2)
         // if (std::abs(msgIn->header.stamp.toSec() - latestKeyTime) >= 1e-2)
             return;
@@ -1910,10 +1910,17 @@ public:
         while (ros::ok())
         {
             rate.sleep();
-            if (loopCloseType == "rs")
-                performRSLoopClosure();
-            else
+            if (loopCloseType == "rs"){
+                performRSLoopClosure();}
+
+            else if (loopCloseType == "sc")
+            {
                 performSCLoopClosure();
+            }
+            else {
+                performSCLoopClosure();
+                performRSLoopClosure();
+            }
             // 可视化
             visualizeLoopClosure();
         }
@@ -1972,7 +1979,6 @@ public:
             Eigen::Affine3f current_key_pose = pclPointToAffine3f(copy_KeyPoses6D->points.back());
 
             double prior_dist = (global_prior_pose.translation().head(2) - current_key_pose.translation().head(2)).norm();
-            printf("prior_dist = %f \n", prior_dist);
             if (prior_dist < nearPriorRadius)
             {
                 // 匹配成功
@@ -2399,28 +2405,10 @@ public:
         mtx.lock();
         *copy_cloudKeyPoses3D = *cloudKeyPoses3D;
         *copy_cloudKeyPoses6D = *cloudKeyPoses6D;
-        const size_t scDescriptorSize = scManager.polarcontexts_.size();
-        if (scDescriptorSize == copy_cloudKeyPoses3D->size())
-            detectResult = scManager.detectLoopClosureID();
+        detectResult = scManager.detectLoopClosureID();
         mtx.unlock();
 
-        if (scDescriptorSize == 0)
-            return;
-
-        if (scDescriptorSize != copy_cloudKeyPoses3D->size())
-        {
-            ROS_WARN_THROTTLE(5.0,
-                              "SC loop skipped: descriptor count does not match key pose count.");
-            return;
-        }
-
         const int loopKeyCur = static_cast<int>(copy_cloudKeyPoses3D->size()) - 1;
-        if (loopKeyCur < 0)
-            return;
-
-        auto it = loopIndexContainer.find(loopKeyCur);
-        if (it != loopIndexContainer.end())
-            return;
 
         const int loopKeyPre = detectResult.first;
         const float yawDiffRad = detectResult.second;
@@ -2447,22 +2435,17 @@ public:
         icp.setRANSACIterations(0);
 
         const Eigen::Affine3f initialGuess = pcl::getTransformation(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, yawDiffRad);
-        // pcl::PointCloud<PointType>::Ptr cureKeyframeCloudInitialized(new pcl::PointCloud<PointType>());
-        // pcl::transformPointCloud(*cureKeyframeCloud, *cureKeyframeCloudInitialized, initialGuess);
 
         icp.setInputSource(cureKeyframeCloud);
         icp.setInputTarget(prevKeyframeCloud);
         pcl::PointCloud<PointType>::Ptr temp_result(new pcl::PointCloud<PointType>());
-        icp.align(*temp_result, initialGuess.matrix());
+        // icp.align(*temp_result, initialGuess.matrix());
+        icp.align(*temp_result);
 
-        // if (icp.hasConverged() == false || icp.getFitnessScore() > historyKeyframeFitnessScore)
-        //     return;
-        if (icp.hasConverged() == false || icp.getFitnessScore() > historyKeyframeFitnessScore) {
-            std::cout << "ICP fitness test failed (" << icp.getFitnessScore() << " > " << historyKeyframeFitnessScore << "). Reject this SC loop." << std::endl;
+        if (icp.hasConverged() == false || icp.getFitnessScore() > historyKeyframeFitnessScore)
             return;
-        } else {
+        else
             std::cout << "ICP fitness test passed (" << icp.getFitnessScore() << " < " << historyKeyframeFitnessScore << "). Add this SC loop." << std::endl;
-        }
 
         if (pubIcpKeyFrames.getNumSubscribers() != 0)
         {
@@ -2473,7 +2456,7 @@ public:
         }
 
         float x, y, z, roll, pitch, yaw;
-        Eigen::Affine3f correctionLidarFrame(icp.getFinalTransformation() * initialGuess.matrix());
+        Eigen::Affine3f correctionLidarFrame(icp.getFinalTransformation());
         pcl::getTranslationAndEulerAngles(correctionLidarFrame, x, y, z, roll, pitch, yaw);
         gtsam::Pose3 poseFrom = Pose3(Rot3::RzRyRx(roll, pitch, yaw), Point3(x, y, z));
         gtsam::Pose3 poseTo = Pose3(Rot3::RzRyRx(0.0, 0.0, 0.0), Point3(0.0, 0.0, 0.0));
@@ -2626,6 +2609,9 @@ public:
                 continue;
             *nearKeyframes += *transformPointCloud(cornerCloudKeyFrames[keyNear], &copy_cloudKeyPoses6D->points[wrt_key]);
             *nearKeyframes += *transformPointCloud(surfCloudKeyFrames[keyNear],   &copy_cloudKeyPoses6D->points[wrt_key]);
+            // Matching in the local scale
+            // *nearKeyframes += *cornerCloudKeyFrames[keyNear];
+            // *nearKeyframes += *surfCloudKeyFrames[keyNear];
         }
 
         if (nearKeyframes->empty())
@@ -2692,8 +2678,8 @@ public:
 
     void saveTUM(){
         ofstream tum_file;
-        // string pkg_path = ros::package::getPath("rolo");
-        tum_file.open("/home/abin/tum_traj/rolo.tum");
+        string pkg_path = ros::package::getPath("rolo");
+        tum_file.open(pkg_path + "/tum_traj/rolo.tum");
         tum_file.clear();
         for (int i=0 ; i<cloudKeyPoses6D->size(); i++){
             geometry_msgs::Quaternion q = tf::createQuaternionMsgFromRollPitchYaw(cloudKeyPoses6D->points[i].roll, 
