@@ -256,7 +256,7 @@ public:
         if(!pose_regulator.initialized())
             return;
 
-        rolo::eskf::PoseESEKF::PoseVectorList futurePoseList = pose_regulator.statePropagate(0.2, 5.0);
+        rolo::eskf::PoseESEKF::PoseVectorList futurePoseList = pose_regulator.planarPropagate(0.2, 6.0);
         if(futurePoseList.empty())
             return;
 

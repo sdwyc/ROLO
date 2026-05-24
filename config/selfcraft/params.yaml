@@ -54,7 +54,7 @@ rolo:
 
   # Loop closure
   loopClosureEnableFlag: true
-  loopCloseType: rs
+  loopCloseType: all
   scInputType: scan_raw
   loopClosureFrequency: 1.0                     # Hz, regulate loop closure constraint add frequency
   surroundingKeyframeSize: 50                   # submap size (when loop closure enabled)

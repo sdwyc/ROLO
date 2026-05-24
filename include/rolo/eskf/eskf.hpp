@@ -245,6 +245,41 @@ public:
     return poses;
   }
 
+  PoseVectorList planarPropagate(double dt, double dis) const {
+    PoseVectorList poses;
+    if(!initialized_ || dt <= 0.0 || dis <= 0.0 || !std::isfinite(dt) || !std::isfinite(dis)) {
+      return poses;
+    }
+
+    PoseState state = kf_.get_x();
+    PoseInput input;
+    input.dt = dt;
+    Eigen::Vector3d last_pos(state.pos);
+    double propagated_dis = 0.0;
+
+    while(propagated_dis < dis) {
+      Eigen::Matrix<double, kStateDim, 1> dx = linearProcessModel2D(state, input);
+      state.oplus(dx, dt);
+
+      Eigen::Vector3d pos(state.pos);
+      double step_dis = (pos - last_pos).norm();
+      if(!std::isfinite(step_dis) || step_dis < 1e-12) {
+        break;
+      }
+
+      propagated_dis += step_dis;
+      last_pos = pos;
+
+      Eigen::Quaterniond q(state.rot);
+      q.normalize();
+      PoseVector pose;
+      pose << pos.x(), pos.y(), pos.z(), q.x(), q.y(), q.z(), q.w();
+      poses.push_back(pose);
+    }
+
+    return poses;
+  }
+
 private:
   void configure() {
     double limit[kStateDof];
@@ -302,6 +337,42 @@ private:
     res.template block<3, 1>(3, 0) = Eigen::Vector3d(s.omega) + 0.5 * input.dt * Eigen::Vector3d(s.alpha);
     res.template block<3, 1>(6, 0) = Eigen::Vector3d(s.acc);
     res.template block<3, 1>(9, 0) = Eigen::Vector3d(s.alpha);
+    return res;
+  }
+
+  static Eigen::Matrix<double, kStateDim, 1> linearProcessModel2D(PoseState& s, PoseInput const& input) {
+    Eigen::Matrix<double, kStateDim, 1> res = Eigen::Matrix<double, kStateDim, 1>::Zero();
+    if(input.dt <= 0.0 || !std::isfinite(input.dt)) {
+      return res;
+    }
+
+    Eigen::Quaterniond q(s.rot);
+    q = normalizedQuaternion(q);
+    Eigen::Matrix3d rot = q.toRotationMatrix();
+    Eigen::Vector3d odom_vel(s.vel);
+    Eigen::Vector3d body_vel = rot.transpose() * odom_vel;
+    Eigen::Vector3d angular_vel(s.omega);
+
+    double linear_vel_x = body_vel.x();
+    double yaw_rate = angular_vel.z();
+
+    double yaw = std::atan2(rot(1, 0), rot(0, 0));
+    double delta_x = 0.0;
+    double delta_y = 0.0;
+    double delta_yaw = yaw_rate * input.dt;
+
+    if(std::abs(yaw_rate) < 1e-8) {
+      delta_x = linear_vel_x * input.dt * std::cos(yaw);
+      delta_y = linear_vel_x * input.dt * std::sin(yaw);
+    } else {
+      double next_yaw = yaw + delta_yaw;
+      delta_x = linear_vel_x / yaw_rate * (std::sin(next_yaw) - std::sin(yaw));
+      delta_y = linear_vel_x / yaw_rate * (std::cos(yaw) - std::cos(next_yaw));
+    }
+
+    res(0, 0) = delta_x / input.dt;
+    res(1, 0) = delta_y / input.dt;
+    res(5, 0) = yaw_rate;
     return res;
   }
 

@@ -10,20 +10,20 @@ prior_pose_node:
   # frame_id: map
   frame_id: base_link
   child_frame_id: prior_base
-  mesh_resource: package://rolo/resource/meshes/scout.dae
+  mesh_resource: package://rolo/resource/meshes/vehicle.dae
   marker_scale: 1.0
 
   # Vehicle model
   vehicle_size_xy: 2.0
 
-  vehicle_com_z: 0.5
-  wheel_xy: [-0.25, 0.275,   
-             0.25, 0.275,   
-             0.25, -0.275,   
-             -0.25, -0.275]  # [x1, y1, x2, y2, ...] in body frame
+  vehicle_com_z: 1.0
+  wheel_xy: [-0.747, 0.463,   
+             0.713, 0.463,   
+             0.747, -0.463,   
+             -0.713, -0.463]  # [x1, y1, x2, y2, ...] in body frame
   
   # Body frame (CoM) -> LiDAR frame
-  lidarOffsetTrans: [0, 0, 0.33]
+  lidarOffsetTrans: [0, 0, 0.94]
   lidarOffsetRot: [1, 0, 0,
                    0, 1, 0,
                    0, 0, 1]
