@@ -296,6 +296,9 @@ public:
         po->y = transPointAssociateToMap(1,0) * pi->x + transPointAssociateToMap(1,1) * pi->y + transPointAssociateToMap(1,2) * pi->z + transPointAssociateToMap(1,3);
         po->z = transPointAssociateToMap(2,0) * pi->x + transPointAssociateToMap(2,1) * pi->y + transPointAssociateToMap(2,2) * pi->z + transPointAssociateToMap(2,3);
         po->intensity = pi->intensity;
+#if HasRGB
+        po->rgb = pi->rgb;
+#endif
     }
     //! 对给定点云中的空间点进行给定的坐标变换
     pcl::PointCloud<PointType>::Ptr transformPointCloud(pcl::PointCloud<PointType>::Ptr cloudIn, PointTypePose* transformIn)
@@ -315,6 +318,9 @@ public:
             cloudOut->points[i].y = transCur(1,0) * pointFrom.x + transCur(1,1) * pointFrom.y + transCur(1,2) * pointFrom.z + transCur(1,3);
             cloudOut->points[i].z = transCur(2,0) * pointFrom.x + transCur(2,1) * pointFrom.y + transCur(2,2) * pointFrom.z + transCur(2,3);
             cloudOut->points[i].intensity = pointFrom.intensity;
+#if HasRGB
+            cloudOut->points[i].rgb = pointFrom.rgb;
+#endif
         }
         return cloudOut;
     }
@@ -524,9 +530,13 @@ public:
         if (cloudKeyPoses3D->points.empty())
         {
             // 来自前端Odometry数据的估计姿态
-            transformTobeMapped[0] = 0.0;
-            transformTobeMapped[1] = 0.0;
-            transformTobeMapped[2] = 0.0;
+            transformTobeMapped[3] = initPose[0];
+            transformTobeMapped[4] = initPose[1];
+            transformTobeMapped[5] = initPose[2];
+
+            transformTobeMapped[0] = initPose[3];
+            transformTobeMapped[1] = initPose[4];
+            transformTobeMapped[2] = initPose[5];
             return;
         }
 
@@ -1193,7 +1203,11 @@ public:
                     downSizeFilterSC.setInputCloud(laserCloudRaw);
                     downSizeFilterSC.filter(*laserCloudRawDS);
                     if (!laserCloudRawDS->empty())
-                        scManager.makeAndSaveScancontextAndKeys(*laserCloudRawDS);
+                    {
+                        pcl::PointCloud<SCPointType> scCloud;
+                        pcl::copyPointCloud(*laserCloudRawDS, scCloud);
+                        scManager.makeAndSaveScancontextAndKeys(scCloud);
+                    }
                     else
                         ROS_WARN_THROTTLE(5.0, "SC loop skipped: downsampled cloud_projected is empty.");
                 }
@@ -1210,7 +1224,11 @@ public:
         else
         {
             if (!thisSurfKeyFrame->empty())
-                scManager.makeAndSaveScancontextAndKeys(*thisSurfKeyFrame);
+            {
+                pcl::PointCloud<SCPointType> scCloud;
+                pcl::copyPointCloud(*thisSurfKeyFrame, scCloud);
+                scManager.makeAndSaveScancontextAndKeys(scCloud);
+            }
             else
                 ROS_WARN_THROTTLE(5.0, "SC loop skipped: current surface feature cloud is empty.");
         }

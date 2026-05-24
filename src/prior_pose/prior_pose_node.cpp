@@ -248,7 +248,7 @@ class PriorPoseNode : public ParamLoader {
       marker.color.r = 0.2f;
       marker.color.g = 0.6f;
       marker.color.b = 0.9f;
-      marker.color.a = 0.95f;
+      marker.color.a = 1.0f; // 0.95f;
       marker.mesh_resource = priorPoseNodeMeshResource;
       marker.mesh_use_embedded_materials = false;
       marker_pub_.publish(marker);

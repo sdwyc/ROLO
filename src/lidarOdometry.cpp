@@ -256,7 +256,7 @@ public:
         if(!pose_regulator.initialized())
             return;
 
-        rolo::eskf::PoseESEKF::PoseVectorList futurePoseList = pose_regulator.statePropagate(0.2, 8.0);
+        rolo::eskf::PoseESEKF::PoseVectorList futurePoseList = pose_regulator.statePropagate(0.2, 5.0);
         if(futurePoseList.empty())
             return;
 
@@ -381,7 +381,7 @@ private:
     Matrix3d Rotation;
     Vector3d Translation;
     Vector3d TranslationOld;
-    float LaserOdomPose[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // [x, y, z, roll, pitch, yaw]
+    float LaserOdomPose[6] = {initPose[0], initPose[1], initPose[2], initPose[3], initPose[4], initPose[5]}; // [x, y, z, roll, pitch, yaw]
 
 
 public:  

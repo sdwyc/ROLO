@@ -18,6 +18,21 @@ POINT_CLOUD_REGISTER_POINT_STRUCT (VelodynePointXYZIRT,
     (uint16_t, ring, ring) (float, time, time)
 )
 
+struct VelodynePointXYZIRTRGB
+{
+    PCL_ADD_POINT4D;
+    PCL_ADD_INTENSITY;
+    PCL_ADD_RGB;
+    uint16_t ring;
+    float time;
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+} EIGEN_ALIGN16;
+
+POINT_CLOUD_REGISTER_POINT_STRUCT (VelodynePointXYZIRTRGB,
+    (float, x, x) (float, y, y) (float, z, z) (float, intensity, intensity)
+    (float, rgb, rgb) (uint16_t, ring, ring) (float, time, time)
+)
+
 struct OusterPointXYZIRT {
     PCL_ADD_POINT4D;
     float intensity;
@@ -34,8 +49,31 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(OusterPointXYZIRT,
     (uint8_t, ring, ring) (uint16_t, noise, noise) (uint32_t, range, range)
 )
 
+struct OusterPointXYZIRTRGB {
+    PCL_ADD_POINT4D;
+    float intensity;
+    PCL_ADD_RGB;
+    uint32_t t;
+    uint16_t reflectivity;
+    uint8_t ring;
+    uint16_t noise;
+    uint32_t range;
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+} EIGEN_ALIGN16;
+POINT_CLOUD_REGISTER_POINT_STRUCT(OusterPointXYZIRTRGB,
+    (float, x, x) (float, y, y) (float, z, z) (float, intensity, intensity)
+    (float, rgb, rgb) (uint32_t, t, t) (uint16_t, reflectivity, reflectivity)
+    (uint8_t, ring, ring) (uint16_t, noise, noise) (uint32_t, range, range)
+)
+
 // Use the Velodyne point format as a common representation
+#if HasRGB
+using PointXYZIRT = VelodynePointXYZIRTRGB;
+using OusterInputPointType = OusterPointXYZIRTRGB;
+#else
 using PointXYZIRT = VelodynePointXYZIRT;
+using OusterInputPointType = OusterPointXYZIRT;
+#endif
 
 const int queueLength = 2000;
 
@@ -60,7 +98,7 @@ private:
     Eigen::Affine3f transStartInverse;
 
     pcl::PointCloud<PointXYZIRT>::Ptr laserCloudIn;
-    pcl::PointCloud<OusterPointXYZIRT>::Ptr tmpOusterCloudIn;
+    pcl::PointCloud<OusterInputPointType>::Ptr tmpOusterCloudIn;
     pcl::PointCloud<PointType>::Ptr   deskewCloud;
     pcl::PointCloud<PointType>::Ptr   fullCloud;
     pcl::PointCloud<PointType>::Ptr   extractedCloud;
@@ -103,7 +141,7 @@ public:
 
     void allocateMemory(){
         laserCloudIn.reset(new pcl::PointCloud<PointXYZIRT>());
-        tmpOusterCloudIn.reset(new pcl::PointCloud<OusterPointXYZIRT>());
+        tmpOusterCloudIn.reset(new pcl::PointCloud<OusterInputPointType>());
         deskewCloud.reset(new pcl::PointCloud<PointType>());
         fullCloud.reset(new pcl::PointCloud<PointType>());
         extractedCloud.reset(new pcl::PointCloud<PointType>());
@@ -205,6 +243,9 @@ public:
                 dst.y = src.y;
                 dst.z = src.z;
                 dst.intensity = src.intensity;
+#if HasRGB
+                dst.rgb = src.rgb;
+#endif
                 dst.ring = src.ring;
                 dst.time = src.t * 1e-9f;
                 // dst.time = src.t * 1.0f;
@@ -303,6 +344,9 @@ public:
                     point.x = laserCloudIn->points[i].y;
                     point.y = laserCloudIn->points[i].z;
                     point.z = laserCloudIn->points[i].x;
+#if HasRGB
+                    point.rgb = laserCloudIn->points[i].rgb;
+#endif
 
                     float ori = -atan2(point.x, point.z);
                     if (!halfPassed) {
@@ -355,6 +399,9 @@ public:
                     point.x = laserCloudIn->points[i].y;
                     point.y = laserCloudIn->points[i].z;
                     point.z = laserCloudIn->points[i].x;
+#if HasRGB
+                    point.rgb = laserCloudIn->points[i].rgb;
+#endif
 
                     float relTime = fabs(laserCloudIn->points[i].time);
                     point.intensity = relTime;
@@ -391,6 +438,9 @@ public:
         newPoint.y = transBt(1,0) * point->x + transBt(1,1) * point->y + transBt(1,2) * point->z + transBt(1,3);
         newPoint.z = transBt(2,0) * point->x + transBt(2,1) * point->y + transBt(2,2) * point->z + transBt(2,3);
         newPoint.intensity = point->intensity;
+#if HasRGB
+        newPoint.rgb = point->rgb;
+#endif
 
         return newPoint;
     }
@@ -408,6 +458,9 @@ public:
             thisPoint.z = laserCloudIn->points[i].z;
             // thisPoint.intensity = laserCloudIn->points[i].intensity;
             thisPoint.intensity = laserCloudIn->points[i].ring*laserCloudIn->points[i].z;
+#if HasRGB
+            thisPoint.rgb = laserCloudIn->points[i].rgb;
+#endif
 
             float range = pointDistance(thisPoint); // 到雷达原点的距离
             // 距离滤波
@@ -450,8 +503,8 @@ public:
             // 填充过的像素位置，不再填充新的值
             if (rangeMat.at<float>(rowIdn, columnIdn) != FLT_MAX)
                 continue;
-
-            thisPoint = deskewPoint(&thisPoint, deskewCloud->points[i].intensity);
+            //TODO deskewPoint Refinement, temporary forbid
+            // thisPoint = deskewPoint(&thisPoint, deskewCloud->points[i].intensity);
             // rangeMat填充
             rangeMat.at<float>(rowIdn, columnIdn) = range;
             // fullCloud点云由一维数组进行有序排列，索引公式为：c + r * width

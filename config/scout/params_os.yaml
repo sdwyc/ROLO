@@ -1,7 +1,7 @@
 rolo:
 
   # Topics
-  pointCloudTopic: "/os_lidar/points" # "ouster/points"               # Point cloud data
+  pointCloudTopic: "ouster/points"               # Point cloud data
   odomTopic: "odometry/lidar"                   # Front end LiDAR odometry, same frequency as LiDAR pointcloud
 
   # Frames
@@ -9,7 +9,6 @@ rolo:
   baselinkFrame: "base_link"
   odometryFrame: "odometry"
   mapFrame: "map"
-  initPose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]   # Initialization for first pose, degree form, [x, y, z, roll, pitch, yaw]
   
   # Export settings
   savePCD: false                              # The enable setting for save global keyframes
@@ -17,13 +16,12 @@ rolo:
 
   # Sensor Settings
   sensor: ouster                            # lidar sensor type, 'velodyne' or 'ouster' or 'livox'
-  N_SCAN: 64                                  # number of lidar channel (i.e., Velodyne/Ouster: 16, 32, 64, 128, Livox Horizon: 6)
+  N_SCAN: 32                                  # number of lidar channel (i.e., Velodyne/Ouster: 16, 32, 64, 128, Livox Horizon: 6)
   Horizon_SCAN: 2048                          # lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048, Livox Horizon: 4000)
   downsampleRate: 1                           # default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
   lidarMinRange: 2.0                          # default: 1.0, minimum lidar range to be used
   lidarMaxRange: 1000.0                       # default: 1000.0, maximum lidar range to be used
   lidarNoiseBound: 0.05                     # lidar noise follows Guassian distribution, this is convariance
-  deskewEnabled: false                         # Enable flag for laser deskew
 
   # LOAM feature threshold
   edgeThreshold: 1.0
@@ -46,11 +44,8 @@ rolo:
   numberOfCores: 8                              # number of cores for mapping optimization
   mappingProcessInterval: 0.15                  # seconds, regulate mapping frequency
 
-  # Scan Reagistration
-  continuousTrajectoryWeight: 0.3
-
   # Surrounding map
-  surroundingkeyframeAddingDistThreshold: 0.5   # meters, regulate keyframe adding threshold
+  surroundingkeyframeAddingDistThreshold: 1.0   # meters, regulate keyframe adding threshold
   surroundingkeyframeAddingAngleThreshold: 0.2  # radians, regulate keyframe adding threshold
   surroundingKeyframeDensity: 2.0               # meters, downsample surrounding keyframe poses   
   surroundingKeyframeSearchRadius: 50.0         # meters, within n meters scan-to-map optimization (when loop closure disabled) 关键帧的搜索范围阈值

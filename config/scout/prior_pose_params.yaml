@@ -11,7 +11,7 @@ prior_pose_node:
   frame_id: base_link
   child_frame_id: prior_base
   mesh_resource: package://rolo/resource/meshes/scout.dae
-  marker_scale: 1.0
+  marker_scale: 1.5
 
   # Vehicle model
   vehicle_size_xy: 2.0

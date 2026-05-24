@@ -9,6 +9,7 @@ rolo:
   baselinkFrame: "base_link"
   odometryFrame: "odometry"
   mapFrame: "map"
+  initPose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]   # Initialization for first pose, degree form, [x, y, z, roll, pitch, yaw]
   
   # Export settings
   savePCD: false                              # The enable setting for save global keyframes
@@ -29,6 +30,8 @@ rolo:
   surfThreshold: 0.1
   edgeFeatureMinValidNum: 20
   surfFeatureMinValidNum: 100
+  groundDegreeThre : 10
+  nearestSearchRadius: 0.2
   
   # voxel filter paprams
   odometrySurfLeafSize: 0.4                     # default: 0.4 - outdoor, 0.2 - indoor

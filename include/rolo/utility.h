@@ -65,7 +65,39 @@ using namespace std;
 using PoseVector = Eigen::Matrix<double, 7, 1>;
 using PoseVectorList = std::vector<PoseVector, Eigen::aligned_allocator<PoseVector>>;
 
+#ifndef HasRGB
+#define HasRGB 1
+#endif
+
+struct EIGEN_ALIGN16 PointXYZIRGB
+{
+    PCL_ADD_POINT4D;
+    PCL_ADD_INTENSITY;
+    PCL_ADD_RGB;
+
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    inline PointXYZIRGB()
+    {
+      x = y = z = 0.0f;
+      data[3] = 1.0f;
+      intensity = 0.0f;
+      rgb = 0.0f;
+    }
+};
+
+POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIRGB,
+    (float,x,x)
+    (float,y,y)
+    (float,z,z)
+    (float,intensity,intensity)
+    (float,rgb,rgb)
+)
+
+#if HasRGB
+typedef PointXYZIRGB PointType;
+#else
 typedef pcl::PointXYZI PointType;
+#endif
 
 enum class lidarType { VELODYNE, OUSTER };
 
@@ -159,6 +191,7 @@ public:
     string baselinkFrame;
     string odometryFrame;
     string mapFrame;
+    std::vector<double> initPose;
 
     // Save pcd
     bool savePCD;
@@ -275,6 +308,10 @@ public:
         nh.param<std::string>("rolo/baselinkFrame", baselinkFrame, "base_link");
         nh.param<std::string>("rolo/odometryFrame", odometryFrame, "odom");
         nh.param<std::string>("rolo/mapFrame", mapFrame, "map");
+        nh.param<vector<double>>("rolo/initPose", initPose, vector<double>());
+        for(int i=3; i<initPose.size(); i++){
+          initPose[i] = initPose[i] * (M_PI/180.0);
+        }
 
         nh.param<bool>("rolo/savePCD", savePCD, false);
         nh.param<std::string>("rolo/savePCDDirectory", savePCDDirectory, "/Downloads/LOAM/");
@@ -313,7 +350,7 @@ public:
         nh.param<float>("rolo/lidarMinRange", lidarMinRange, 1.0);
         nh.param<float>("rolo/lidarMaxRange", lidarMaxRange, 1000.0);
         nh.param<float>("rolo/lidarNoiseBound", lidarNoiseBound, 0.05);
-        nh.param<bool>("rolo/deskewEnabled", deskewEnabled, true);
+        nh.param<bool>("rolo/deskewEnabled", deskewEnabled, false);
 
         nh.param<float>("rolo/edgeThreshold", edgeThreshold, 0.1);
         nh.param<float>("rolo/surfThreshold", surfThreshold, 0.1);
