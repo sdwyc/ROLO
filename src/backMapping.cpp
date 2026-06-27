@@ -1,6 +1,6 @@
-#include "rolo/utility.h"
-// #include "rolo/save_map.h"
-#include "rolo/pose_solver.hpp"
+#include "terra/utility.h"
+// #include "terra/save_map.h"
+#include "terra/pose_solver.hpp"
 #include "scancontext/Scancontext.h"
 #include <small_gicp/ann/gaussian_voxelmap.hpp>
 #include <small_gicp/factors/gicp_factor.hpp>
@@ -110,7 +110,7 @@ public:
     pcl::PointCloud<GroundPatchType>::Ptr GroundCloudFromlaser;
 
     std::deque<nav_msgs::Odometry> gpsQueue;
-    rolo::CloudInfoStamp cloudInfo;
+    terra::CloudInfoStamp cloudInfo;
 
     vector<pcl::PointCloud<PointType>::Ptr> cornerCloudKeyFrames;   // 所有关键帧的角点集合（降采样）
     vector<pcl::PointCloud<PointType>::Ptr> surfCloudKeyFrames; // 所有关键帧的平面点集合（降采样）
@@ -202,37 +202,37 @@ public:
         parameters.relinearizeSkip = 1;
         isam = new ISAM2(parameters); // 实例化ISAM
 
-        pubKeyPoses                 = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/trajectory", 1);  // 全局路径
-        pubLaserCloudSurround       = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/map_global", 1);  // 全局地图
-        pubLaserOdometryGlobal      = nh.advertise<nav_msgs::Odometry> ("rolo/mapping/odometry", 1);         // 里程计
-        pubLaserOdometryIncremental = nh.advertise<nav_msgs::Odometry> ("rolo/mapping/odometry_incremental", 1);
-        pubPath                     = nh.advertise<nav_msgs::Path>("rolo/mapping/path", 1);  // 全局路径
+        pubKeyPoses                 = nh.advertise<sensor_msgs::PointCloud2>("terra/mapping/trajectory", 1);  // 全局路径
+        pubLaserCloudSurround       = nh.advertise<sensor_msgs::PointCloud2>("terra/mapping/map_global", 1);  // 全局地图
+        pubLaserOdometryGlobal      = nh.advertise<nav_msgs::Odometry> ("terra/mapping/odometry", 1);         // 里程计
+        pubLaserOdometryIncremental = nh.advertise<nav_msgs::Odometry> ("terra/mapping/odometry_incremental", 1);
+        pubPath                     = nh.advertise<nav_msgs::Path>("terra/mapping/path", 1);  // 全局路径
         // Feature extration传过来的cloud_info
-        subCloud = nh.subscribe<rolo::CloudInfoStamp>(odomTopic+"/cloud_info", 1, &backMapping::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
-        subPriorPose = nh.subscribe<rolo::CloudInfoStamp>("vehicle_prior_info", 1, &backMapping::priorInfoHandler, this, ros::TransportHints().tcpNoDelay());
+        subCloud = nh.subscribe<terra::CloudInfoStamp>(odomTopic+"/cloud_info", 1, &backMapping::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
+        subPriorPose = nh.subscribe<terra::CloudInfoStamp>("vehicle_prior_info", 1, &backMapping::priorInfoHandler, this, ros::TransportHints().tcpNoDelay());
         subGroundMap = nh.subscribe<sensor_msgs::PointCloud2>(priorPoseNodePcdTopic, 1, &backMapping::groundMapHandler, this, ros::TransportHints().tcpNoDelay());
 
         // 回环数据
         // subLoop  = nh.subscribe<std_msgs::Float64MultiArray>("lio_loop/loop_closure_detection", 1, &backMapping::loopInfoHandler, this, ros::TransportHints().tcpNoDelay());
 
-        // srvSaveMap  = nh.advertiseService("rolo/save_map", &backMapping::saveMapService, this);
+        // srvSaveMap  = nh.advertiseService("terra/save_map", &backMapping::saveMapService, this);
 
         // 历史关键帧点云
-        pubHistoryKeyFrames   = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/icp_loop_closure_history_cloud", 1);
+        pubHistoryKeyFrames   = nh.advertise<sensor_msgs::PointCloud2>("terra/mapping/icp_loop_closure_history_cloud", 1);
         // 关联关键帧点云
-        pubIcpKeyFrames       = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/icp_loop_closure_corrected_cloud", 1);
-        pubGlobalGraph        = nh.advertise<visualization_msgs::MarkerArray>("rolo/mapping/global_graph", 1);
-        pubLoopConstraintEdge = nh.advertise<visualization_msgs::MarkerArray>("/rolo/mapping/loop_closure_constraints", 1);
-        pubPriorPredictions   = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>("/rolo/mapping/prior_predictions", 1);
-        pubPriorPatches       = nh.advertise<sensor_msgs::PointCloud2>("/rolo/mapping/prior_patches", 1);
+        pubIcpKeyFrames       = nh.advertise<sensor_msgs::PointCloud2>("terra/mapping/icp_loop_closure_corrected_cloud", 1);
+        pubGlobalGraph        = nh.advertise<visualization_msgs::MarkerArray>("terra/mapping/global_graph", 1);
+        pubLoopConstraintEdge = nh.advertise<visualization_msgs::MarkerArray>("/terra/mapping/loop_closure_constraints", 1);
+        pubPriorPredictions   = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>("/terra/mapping/prior_predictions", 1);
+        pubPriorPatches       = nh.advertise<sensor_msgs::PointCloud2>("/terra/mapping/prior_patches", 1);
         pubCurrentPatch       = nh.advertise<sensor_msgs::PointCloud2>("extracted_patch_current", 1);
         //  局部地图
-        pubRecentKeyFrames    = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/map_local", 1);
+        pubRecentKeyFrames    = nh.advertise<sensor_msgs::PointCloud2>("terra/mapping/map_local", 1);
         // 当前关键帧
-        pubRecentKeyFrame     = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/cloud_registered", 1);
-        pubCloudRegisteredRaw = nh.advertise<sensor_msgs::PointCloud2>("rolo/mapping/cloud_registered_raw", 1);
+        pubRecentKeyFrame     = nh.advertise<sensor_msgs::PointCloud2>("terra/mapping/cloud_registered", 1);
+        pubCloudRegisteredRaw = nh.advertise<sensor_msgs::PointCloud2>("terra/mapping/cloud_registered_raw", 1);
 
-        pubSLAMInfo           = nh.advertise<rolo::CloudInfoStamp>("rolo/mapping/slam_info", 1);
+        pubSLAMInfo           = nh.advertise<terra::CloudInfoStamp>("terra/mapping/slam_info", 1);
 
         const float kSCFilterSize = 0.5f;
         downSizeFilterSC.setLeafSize(kSCFilterSize, kSCFilterSize, kSCFilterSize);
@@ -250,10 +250,10 @@ public:
 
         if (savePCD)
         {
-            const std::string pkg_path = ros::package::getPath("rolo");
+            const std::string pkg_path = ros::package::getPath("terra");
             if (pkg_path.empty())
             {
-                ROS_ERROR("Failed to resolve ROLO package path for saving PCDs.");
+                ROS_ERROR("Failed to resolve TERRA package path for saving PCDs.");
             }
             else
             {
@@ -423,7 +423,7 @@ public:
     }
 
     //! 激光回调函数，
-    void laserCloudInfoHandler(const rolo::CloudInfoStampConstPtr& msgIn){
+    void laserCloudInfoHandler(const terra::CloudInfoStampConstPtr& msgIn){
         // extract time stamp 提取时间戳
         timeLaserInfoStamp = msgIn->header.stamp;
         timeLaserInfoCur = msgIn->header.stamp.toSec();
@@ -462,7 +462,7 @@ public:
         }
     }
 
-    void priorInfoHandler(const rolo::CloudInfoStampConstPtr& msgIn)
+    void priorInfoHandler(const terra::CloudInfoStampConstPtr& msgIn)
     {
         const double msgTime = msgIn->header.stamp.toSec();
         double latestKeyTime = 0.0;
@@ -2696,8 +2696,8 @@ public:
 
     void saveTUM(){
         ofstream tum_file;
-        string pkg_path = ros::package::getPath("rolo");
-        tum_file.open(pkg_path + "/tum_traj/rolo.tum");
+        string pkg_path = ros::package::getPath("terra");
+        tum_file.open(pkg_path + "/tum_traj/terra.tum");
         tum_file.clear();
         for (int i=0 ; i<cloudKeyPoses6D->size(); i++){
             geometry_msgs::Quaternion q = tf::createQuaternionMsgFromRollPitchYaw(cloudKeyPoses6D->points[i].roll, 
@@ -2719,7 +2719,7 @@ public:
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "rolo");
+    ros::init(argc, argv, "terra");
     // 实例化后端优化类
     backMapping BM;
 

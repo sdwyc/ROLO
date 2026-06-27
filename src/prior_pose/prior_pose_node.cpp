@@ -20,9 +20,9 @@
 #include <string>
 #include <vector>
 
-#include "rolo/utility.h"
-#include "rolo/pose_solver.hpp"
-#include "rolo/CloudInfoStamp.h"
+#include "terra/utility.h"
+#include "terra/pose_solver.hpp"
+#include "terra/CloudInfoStamp.h"
 
 namespace {
 
@@ -123,7 +123,7 @@ class PriorPoseNode : public ParamLoader {
     odom_sub_ = nh.subscribe<nav_msgs::Odometry>(
         odomTopic + "_incremental", 1, &PriorPoseNode::OdomCallback, this);
 
-    prior_pub_ = nh.advertise<rolo::CloudInfoStamp>("vehicle_prior_info", 1, true);
+    prior_pub_ = nh.advertise<terra::CloudInfoStamp>("vehicle_prior_info", 1, true);
     extracted_patch_pub_ = nh.advertise<sensor_msgs::PointCloud2>("extracted_patch_prior", 1, true);
     marker_pub_ = nh.advertise<visualization_msgs::Marker>("vehicle_marker", 1, true);
     model_marker_pub_ = nh.advertise<visualization_msgs::Marker>("vehicle_model_marker", 1, true);
@@ -210,7 +210,7 @@ class PriorPoseNode : public ParamLoader {
       out_pose.header.frame_id = priorPoseNodeFrameId;
       out_pose.pose = ToPoseMsg(T_world_lidar);
 
-      rolo::CloudInfoStamp prior_info;
+      terra::CloudInfoStamp prior_info;
       prior_info.header = out_pose.header;
       prior_info.initialGuessX = static_cast<float>(out_pose.pose.position.x);
       prior_info.initialGuessY = static_cast<float>(out_pose.pose.position.y);

@@ -1,7 +1,7 @@
 <launch>
     <param name="use_sim_time" value="true" />
 
-    <arg name="project" default="rolo"/>
+    <arg name="project" default="terra"/>
     
     <node pkg="$(arg project)" type="$(arg project)_lidarOdometry"     name="$(arg project)_lidarOdometry"    output="screen"     respawn="true"/>
     <node pkg="$(arg project)" type="$(arg project)_imageProjection"     name="$(arg project)_imageProjection"      output="screen"     respawn="true"/>

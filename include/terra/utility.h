@@ -57,7 +57,7 @@
 #include <array>
 #include <thread>
 #include <mutex>
-#include "rolo/CloudInfoStamp.h"
+#include "terra/CloudInfoStamp.h"
 #include <opencv2/opencv.hpp>
 #include <eigen3/Eigen/Dense>
 using namespace std;
@@ -301,23 +301,23 @@ public:
     {
         nh.param<std::string>("/robot_id", robot_id, "roboat");
 
-        nh.param<std::string>("rolo/pointCloudTopic", pointCloudTopic, "points_raw");
-        nh.param<std::string>("rolo/odomTopic", odomTopic, "odometry/imu");
+        nh.param<std::string>("terra/pointCloudTopic", pointCloudTopic, "points_raw");
+        nh.param<std::string>("terra/odomTopic", odomTopic, "odometry/imu");
 
-        nh.param<std::string>("rolo/lidarFrame", lidarFrame, "base_link");
-        nh.param<std::string>("rolo/baselinkFrame", baselinkFrame, "base_link");
-        nh.param<std::string>("rolo/odometryFrame", odometryFrame, "odom");
-        nh.param<std::string>("rolo/mapFrame", mapFrame, "map");
-        nh.param<vector<double>>("rolo/initPose", initPose, vector<double>());
+        nh.param<std::string>("terra/lidarFrame", lidarFrame, "base_link");
+        nh.param<std::string>("terra/baselinkFrame", baselinkFrame, "base_link");
+        nh.param<std::string>("terra/odometryFrame", odometryFrame, "odom");
+        nh.param<std::string>("terra/mapFrame", mapFrame, "map");
+        nh.param<vector<double>>("terra/initPose", initPose, vector<double>());
         for(int i=3; i<initPose.size(); i++){
           initPose[i] = initPose[i] * (M_PI/180.0);
         }
 
-        nh.param<bool>("rolo/savePCD", savePCD, false);
-        nh.param<std::string>("rolo/savePCDDirectory", savePCDDirectory, "/Downloads/LOAM/");
+        nh.param<bool>("terra/savePCD", savePCD, false);
+        nh.param<std::string>("terra/savePCDDirectory", savePCDDirectory, "/Downloads/LOAM/");
 
         std::string sensorStr;
-        nh.param<std::string>("rolo/sensor", sensorStr, requireSensorConfig ? "" : "velodyne");
+        nh.param<std::string>("terra/sensor", sensorStr, requireSensorConfig ? "" : "velodyne");
         if (sensorStr == "velodyne")
         {
             sensor = lidarType::VELODYNE;
@@ -344,40 +344,40 @@ public:
             }
         }
 
-        nh.param<int>("rolo/N_SCAN", N_SCAN, 16);
-        nh.param<int>("rolo/Horizon_SCAN", Horizon_SCAN, 1800);
-        nh.param<int>("rolo/downsampleRate", downsampleRate, 1);
-        nh.param<float>("rolo/lidarMinRange", lidarMinRange, 1.0);
-        nh.param<float>("rolo/lidarMaxRange", lidarMaxRange, 1000.0);
-        nh.param<float>("rolo/lidarNoiseBound", lidarNoiseBound, 0.05);
-        nh.param<bool>("rolo/deskewEnabled", deskewEnabled, false);
+        nh.param<int>("terra/N_SCAN", N_SCAN, 16);
+        nh.param<int>("terra/Horizon_SCAN", Horizon_SCAN, 1800);
+        nh.param<int>("terra/downsampleRate", downsampleRate, 1);
+        nh.param<float>("terra/lidarMinRange", lidarMinRange, 1.0);
+        nh.param<float>("terra/lidarMaxRange", lidarMaxRange, 1000.0);
+        nh.param<float>("terra/lidarNoiseBound", lidarNoiseBound, 0.05);
+        nh.param<bool>("terra/deskewEnabled", deskewEnabled, false);
 
-        nh.param<float>("rolo/edgeThreshold", edgeThreshold, 0.1);
-        nh.param<float>("rolo/surfThreshold", surfThreshold, 0.1);
-        nh.param<int>("rolo/edgeFeatureMinValidNum", edgeFeatureMinValidNum, 10);
-        nh.param<int>("rolo/surfFeatureMinValidNum", surfFeatureMinValidNum, 100);
+        nh.param<float>("terra/edgeThreshold", edgeThreshold, 0.1);
+        nh.param<float>("terra/surfThreshold", surfThreshold, 0.1);
+        nh.param<int>("terra/edgeFeatureMinValidNum", edgeFeatureMinValidNum, 10);
+        nh.param<int>("terra/surfFeatureMinValidNum", surfFeatureMinValidNum, 100);
 
-        nh.param<float>("rolo/odometrySurfLeafSize", odometrySurfLeafSize, 0.2);
-        nh.param<float>("rolo/mappingCornerLeafSize", mappingCornerLeafSize, 0.2);
-        nh.param<float>("rolo/mappingSurfLeafSize", mappingSurfLeafSize, 0.2);
+        nh.param<float>("terra/odometrySurfLeafSize", odometrySurfLeafSize, 0.2);
+        nh.param<float>("terra/mappingCornerLeafSize", mappingCornerLeafSize, 0.2);
+        nh.param<float>("terra/mappingSurfLeafSize", mappingSurfLeafSize, 0.2);
 
-        nh.param<float>("rolo/z_tollerance", z_tollerance, FLT_MAX);
-        nh.param<float>("rolo/rotation_tollerance", rotation_tollerance, FLT_MAX);
+        nh.param<float>("terra/z_tollerance", z_tollerance, FLT_MAX);
+        nh.param<float>("terra/rotation_tollerance", rotation_tollerance, FLT_MAX);
 
-        nh.param<int>("rolo/numberOfCores", numberOfCores, 2);
-        nh.param<double>("rolo/mappingProcessInterval", mappingProcessInterval, 0.15);
+        nh.param<int>("terra/numberOfCores", numberOfCores, 2);
+        nh.param<double>("terra/mappingProcessInterval", mappingProcessInterval, 0.15);
 
-        nh.param<float>("rolo/continuousTrajectoryWeight", CT_lambda, 1.0);
+        nh.param<float>("terra/continuousTrajectoryWeight", CT_lambda, 1.0);
         
-        nh.param<float>("rolo/surroundingkeyframeAddingDistThreshold", surroundingkeyframeAddingDistThreshold, 1.0);
-        nh.param<float>("rolo/surroundingkeyframeAddingAngleThreshold", surroundingkeyframeAddingAngleThreshold, 0.2);
-        nh.param<float>("rolo/surroundingKeyframeDensity", surroundingKeyframeDensity, 1.0);
-        nh.param<float>("rolo/surroundingKeyframeSearchRadius", surroundingKeyframeSearchRadius, 50.0);
+        nh.param<float>("terra/surroundingkeyframeAddingDistThreshold", surroundingkeyframeAddingDistThreshold, 1.0);
+        nh.param<float>("terra/surroundingkeyframeAddingAngleThreshold", surroundingkeyframeAddingAngleThreshold, 0.2);
+        nh.param<float>("terra/surroundingKeyframeDensity", surroundingKeyframeDensity, 1.0);
+        nh.param<float>("terra/surroundingKeyframeSearchRadius", surroundingKeyframeSearchRadius, 50.0);
 
-        nh.param<bool>("rolo/loopClosureEnableFlag", loopClosureEnableFlag, true);
-        nh.param<std::string>("rolo/loopCloseType", loopCloseType, "sc");
+        nh.param<bool>("terra/loopClosureEnableFlag", loopClosureEnableFlag, true);
+        nh.param<std::string>("terra/loopCloseType", loopCloseType, "sc");
         std::transform(loopCloseType.begin(), loopCloseType.end(), loopCloseType.begin(), ::tolower);
-        nh.param<std::string>("rolo/scInputType", scInputType, "scan_raw");
+        nh.param<std::string>("terra/scInputType", scInputType, "scan_raw");
         std::transform(scInputType.begin(), scInputType.end(), scInputType.begin(), ::tolower);
         if (scInputType == "raw")
             scInputType = "scan_raw";
@@ -385,15 +385,15 @@ public:
             scInputType = "scan_feat";
         if (scInputType != "scan_raw" && scInputType != "scan_feat")
         {
-            ROS_WARN_STREAM("Invalid rolo/scInputType '" << scInputType << "', fallback to 'scan_raw'.");
+            ROS_WARN_STREAM("Invalid terra/scInputType '" << scInputType << "', fallback to 'scan_raw'.");
             scInputType = "scan_raw";
         }
-        nh.param<float>("rolo/loopClosureFrequency", loopClosureFrequency, 1.0);
-        nh.param<int>("rolo/surroundingKeyframeSize", surroundingKeyframeSize, 50);
-        nh.param<float>("rolo/historyKeyframeSearchRadius", historyKeyframeSearchRadius, 10.0);
-        nh.param<float>("rolo/historyKeyframeSearchTimeDiff", historyKeyframeSearchTimeDiff, 30.0);
-        nh.param<int>("rolo/historyKeyframeSearchNum", historyKeyframeSearchNum, 25);
-        nh.param<float>("rolo/historyKeyframeFitnessScore", historyKeyframeFitnessScore, 0.3);
+        nh.param<float>("terra/loopClosureFrequency", loopClosureFrequency, 1.0);
+        nh.param<int>("terra/surroundingKeyframeSize", surroundingKeyframeSize, 50);
+        nh.param<float>("terra/historyKeyframeSearchRadius", historyKeyframeSearchRadius, 10.0);
+        nh.param<float>("terra/historyKeyframeSearchTimeDiff", historyKeyframeSearchTimeDiff, 30.0);
+        nh.param<int>("terra/historyKeyframeSearchNum", historyKeyframeSearchNum, 25);
+        nh.param<float>("terra/historyKeyframeFitnessScore", historyKeyframeFitnessScore, 0.3);
         nh.param<bool>("prior_factor/priorFactorEnableFlag", priorFactorEnableFlag, true);
         nh.param<float>("prior_factor/priorFactorFrequency", priorFactorFrequency, 1.0);
         nh.param<float>("prior_factor/groundPatchSize", groundPatchSize, 2.0);
@@ -412,7 +412,7 @@ public:
         nh.param<std::string>("prior_pose_node/pose_cov_topic", priorPoseNodePoseCovTopic, "/initialpose");
         nh.param<std::string>("prior_pose_node/frame_id", priorPoseNodeFrameId, "map");
         nh.param<std::string>("prior_pose_node/child_frame_id", priorPoseNodeChildFrameId, "vehicle");
-        nh.param<std::string>("prior_pose_node/mesh_resource", priorPoseNodeMeshResource, "package://rolo/resource/meshes/vehicle.dae");
+        nh.param<std::string>("prior_pose_node/mesh_resource", priorPoseNodeMeshResource, "package://terra/resource/meshes/vehicle.dae");
         nh.param<double>("prior_pose_node/marker_scale", priorPoseNodeMarkerScale, 1.0);
         nh.param<double>("prior_pose_node/vehicle_size_xy", priorVehicleSizeXY, 2.0);
         nh.param<double>("prior_pose_node/vehicle_com_z", priorVehicleComZ, 1.0);
@@ -460,9 +460,9 @@ public:
             priorVehicleSizeY = std::max(max_y - min_y, 0.1);
         }
 
-        nh.param<float>("rolo/globalMapVisualizationSearchRadius", globalMapVisualizationSearchRadius, 1e3);
-        nh.param<float>("rolo/globalMapVisualizationPoseDensity", globalMapVisualizationPoseDensity, 10.0);
-        nh.param<float>("rolo/globalMapVisualizationLeafSize", globalMapVisualizationLeafSize, 1.0);
+        nh.param<float>("terra/globalMapVisualizationSearchRadius", globalMapVisualizationSearchRadius, 1e3);
+        nh.param<float>("terra/globalMapVisualizationPoseDensity", globalMapVisualizationPoseDensity, 10.0);
+        nh.param<float>("terra/globalMapVisualizationLeafSize", globalMapVisualizationLeafSize, 1.0);
 
         usleep(100);
     }

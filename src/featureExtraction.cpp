@@ -1,4 +1,4 @@
-#include "rolo/utility.h"
+#include "terra/utility.h"
 
 struct smoothness_ind{ 
     float value;    // 平滑度大小
@@ -30,7 +30,7 @@ public:
     pcl::VoxelGrid<PointType> downSizeFilter;
 
 
-    rolo::CloudInfoStamp cloudInfo;
+    terra::CloudInfoStamp cloudInfo;
     std_msgs::Header cloudHeader;
 
     std::vector<smoothness_ind> cloudSmoothness;  // 存储输入点云里每个点的平滑度和索引值，并按照平滑度从小到大排序
@@ -41,12 +41,12 @@ public:
     FeatureExtraction()
     {
         //! 输入：image_projection传来的cloud_info，输出：角点点云，平面点点云，feature_cloud_info
-        subLaserCloudInfo = nh.subscribe<rolo::CloudInfoStamp>("rolo/cloud_info", 1, &FeatureExtraction::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
+        subLaserCloudInfo = nh.subscribe<terra::CloudInfoStamp>("terra/cloud_info", 1, &FeatureExtraction::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
 
-        pubLaserCloudInfo = nh.advertise<rolo::CloudInfoStamp> ("rolo/feature/cloud_info", 1);
-        pubCornerPoints = nh.advertise<sensor_msgs::PointCloud2>("rolo/feature/cloud_corner", 1);
-        pubSurfacePoints = nh.advertise<sensor_msgs::PointCloud2>("rolo/feature/cloud_surface", 1);
-        pubNormalPoints = nh.advertise<sensor_msgs::PointCloud2>("rolo/feature/cloud_normal", 1);
+        pubLaserCloudInfo = nh.advertise<terra::CloudInfoStamp> ("terra/feature/cloud_info", 1);
+        pubCornerPoints = nh.advertise<sensor_msgs::PointCloud2>("terra/feature/cloud_corner", 1);
+        pubSurfacePoints = nh.advertise<sensor_msgs::PointCloud2>("terra/feature/cloud_surface", 1);
+        pubNormalPoints = nh.advertise<sensor_msgs::PointCloud2>("terra/feature/cloud_normal", 1);
 
         initializationValue();
     }
@@ -68,7 +68,7 @@ public:
         cloudLabel = new int[N_SCAN*Horizon_SCAN];
     }
     //! range_image回调函数，主要完成：平滑度计算，特征提取，输出点云
-    void laserCloudInfoHandler(const rolo::CloudInfoStampConstPtr& cloudIn)
+    void laserCloudInfoHandler(const terra::CloudInfoStampConstPtr& cloudIn)
     {
         // 存储msgIn
         cloudInfo = *cloudIn; // new cloud info
@@ -290,7 +290,7 @@ public:
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "rolo");
+    ros::init(argc, argv, "terra");
 
     FeatureExtraction FE;
 

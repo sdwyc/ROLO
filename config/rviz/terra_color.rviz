@@ -379,7 +379,7 @@ Visualization Manager:
           Size (Pixels): 5
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /rolo/feature/cloud_corner
+          Topic: /terra/feature/cloud_corner
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -407,7 +407,7 @@ Visualization Manager:
           Size (Pixels): 3
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /rolo/feature/cloud_surface
+          Topic: /terra/feature/cloud_surface
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -435,7 +435,7 @@ Visualization Manager:
           Size (Pixels): 5
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /rolo/feature/cloud_groud
+          Topic: /terra/feature/cloud_groud
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -454,8 +454,8 @@ Visualization Manager:
           Channel Name: intensity
           Class: rviz/PointCloud2
           Color: 239; 41; 41
-          Color Transformer: Intensity
-          Decay Time: 50
+          Color Transformer: RGB8
+          Decay Time: 500
           Enabled: true
           Invert Rainbow: false
           Max Color: 255; 255; 255
@@ -467,7 +467,7 @@ Visualization Manager:
           Size (Pixels): 3
           Size (m): 0.10000000149011612
           Style: Points
-          Topic: /rolo/mapping/cloud_registered
+          Topic: /terra/mapping/cloud_registered
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -495,7 +495,7 @@ Visualization Manager:
           Size (Pixels): 2
           Size (m): 0.10000000149011612
           Style: Flat Squares
-          Topic: /rolo/mapping/map_local
+          Topic: /terra/mapping/map_local
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -510,7 +510,7 @@ Visualization Manager:
           Channel Name: intensity
           Class: rviz/PointCloud2
           Color: 85; 255; 255
-          Color Transformer: Intensity
+          Color Transformer: RGB8
           Decay Time: 0
           Enabled: true
           Invert Rainbow: false
@@ -523,7 +523,7 @@ Visualization Manager:
           Size (Pixels): 3
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /rolo/mapping/map_global
+          Topic: /terra/mapping/map_global
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -549,7 +549,7 @@ Visualization Manager:
           Radius: 0.029999999329447746
           Shaft Diameter: 0.10000000149011612
           Shaft Length: 0.10000000149011612
-          Topic: /rolo/mapping/path
+          Topic: /terra/mapping/path
           Unreliable: false
           Value: true
         - Alpha: 1
@@ -573,7 +573,7 @@ Visualization Manager:
           Radius: 0.10000000149011612
           Shaft Diameter: 0.10000000149011612
           Shaft Length: 0.10000000149011612
-          Topic: /rolo/lidar_odometry/path
+          Topic: /terra/lidar_odometry/path
           Unreliable: false
           Value: true
         - Alpha: 1
@@ -599,31 +599,28 @@ Visualization Manager:
           Size (Pixels): 2
           Size (m): 0.30000001192092896
           Style: Flat Squares
-          Topic: /rolo/mapping/icp_loop_closure_corrected_cloud
+          Topic: /terra/mapping/icp_loop_closure_corrected_cloud
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
           Value: false
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /rolo/mapping/loop_closure_constraints
+          Marker Topic: /terra/mapping/loop_closure_constraints
           Name: Loop constraint
           Namespaces:
-            loop_edges: true
-            loop_nodes: true
+            {}
           Queue Size: 100
           Value: true
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /rolo/mapping/global_graph
+          Marker Topic: /terra/mapping/global_graph
           Name: FactorGraph
           Namespaces:
             global_graph_axes: false
             global_graph_edges: true
             global_graph_factors: true
             global_graph_nodes: true
-            global_graph_prior_axes: true
-            global_graph_prior_pose: true
           Queue Size: 100
           Value: true
       Enabled: true
@@ -713,7 +710,7 @@ Visualization Manager:
           Enabled: true
           Name: Prior_Predictions
           Queue Size: 100
-          Topic: /rolo/mapping/prior_predictions
+          Topic: /terra/mapping/prior_predictions
           Unreliable: false
           Value: true
           alpha: 0.800000011920929
@@ -759,7 +756,7 @@ Visualization Manager:
           Marker Topic: /vehicle_marker
           Name: Prior_Pose
           Namespaces:
-            prior_pose: true
+            {}
           Queue Size: 100
           Value: true
       Enabled: true
@@ -787,14 +784,14 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.009999999776482582
       Style: Points
-      Topic: /rolo/mapping/prior_patches
+      Topic: /terra/mapping/prior_patches
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
       Value: false
   Enabled: true
   Global Options:
-    Background Color: 0; 0; 0
+    Background Color: 243; 243; 243
     Default Light: true
     Fixed Frame: odometry
     Frame Rate: 30
@@ -808,7 +805,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 33.51964569091797
+      Distance: 50.68700408935547
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -816,17 +813,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -0.03271552920341492
-        Y: -0.0146822240203619
-        Z: -0.010651597753167152
+        X: 0.20403873920440674
+        Y: -0.5097112655639648
+        Z: 0.09581197053194046
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.37980103492736816
+      Pitch: 0.3797973394393921
       Target Frame: base_link
-      Yaw: 4.021359920501709
+      Yaw: 0.593196451663971
     Saved: ~
 Window Geometry:
   Displays:

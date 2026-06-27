@@ -315,7 +315,7 @@ class DualOdomDeltaStateNode(object):
         # topics / frames / timers
         # -------------------------
         self.front_topic = rospy.get_param("~front_topic", "/odometry/lidar_incremental")
-        self.back_topic = rospy.get_param("~back_topic", "/rolo/mapping/odometry_incremental")
+        self.back_topic = rospy.get_param("~back_topic", "/terra/mapping/odometry_incremental")
         self.output_topic = rospy.get_param("~output_topic", "/fused_odom")
 
         self.world_frame = rospy.get_param("~world_frame", "odometry")

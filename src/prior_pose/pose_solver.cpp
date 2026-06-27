@@ -1,4 +1,4 @@
-#include "rolo/pose_solver.hpp"
+#include "terra/pose_solver.hpp"
 
 #include <pcl/filters/passthrough.h>
 #include <pcl_conversions/pcl_conversions.h>

@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>rolo</name>
+  <name>terra</name>
   <version>0.0.0</version>
-  <description>The rolo package</description>
+  <description>The terra package</description>
 
   <maintainer email="sdwyc@mail.sdu.edu.cn">wyc</maintainer>
 

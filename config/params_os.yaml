@@ -1,4 +1,4 @@
-rolo:
+terra:
 
   # Topics
   pointCloudTopic: "/os_lidar/points" # "ouster/points"               # Point cloud data

@@ -382,7 +382,7 @@ Visualization Manager:
           Size (Pixels): 5
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /rolo/feature/cloud_corner
+          Topic: /terra/feature/cloud_corner
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -410,7 +410,7 @@ Visualization Manager:
           Size (Pixels): 3
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /rolo/feature/cloud_surface
+          Topic: /terra/feature/cloud_surface
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -438,7 +438,7 @@ Visualization Manager:
           Size (Pixels): 5
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /rolo/feature/cloud_groud
+          Topic: /terra/feature/cloud_groud
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -472,7 +472,7 @@ Visualization Manager:
           Size (Pixels): 1
           Size (m): 0.05999999865889549
           Style: Spheres
-          Topic: /rolo/mapping/cloud_registered
+          Topic: /terra/mapping/cloud_registered
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -500,7 +500,7 @@ Visualization Manager:
           Size (Pixels): 2
           Size (m): 0.10000000149011612
           Style: Flat Squares
-          Topic: /rolo/mapping/map_local
+          Topic: /terra/mapping/map_local
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -528,7 +528,7 @@ Visualization Manager:
           Size (Pixels): 3
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /rolo/mapping/map_global
+          Topic: /terra/mapping/map_global
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -554,7 +554,7 @@ Visualization Manager:
           Radius: 0.029999999329447746
           Shaft Diameter: 0.10000000149011612
           Shaft Length: 0.10000000149011612
-          Topic: /rolo/mapping/path
+          Topic: /terra/mapping/path
           Unreliable: false
           Value: false
         - Alpha: 1
@@ -578,7 +578,7 @@ Visualization Manager:
           Radius: 0.10000000149011612
           Shaft Diameter: 0.10000000149011612
           Shaft Length: 0.10000000149011612
-          Topic: /rolo/lidar_odometry/path
+          Topic: /terra/lidar_odometry/path
           Unreliable: false
           Value: true
         - Alpha: 1
@@ -604,14 +604,14 @@ Visualization Manager:
           Size (Pixels): 2
           Size (m): 0.30000001192092896
           Style: Flat Squares
-          Topic: /rolo/mapping/icp_loop_closure_corrected_cloud
+          Topic: /terra/mapping/icp_loop_closure_corrected_cloud
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
           Value: false
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /rolo/mapping/loop_closure_constraints
+          Marker Topic: /terra/mapping/loop_closure_constraints
           Name: Loop constraint
           Namespaces:
             {}
@@ -619,7 +619,7 @@ Visualization Manager:
           Value: true
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /rolo/mapping/global_graph
+          Marker Topic: /terra/mapping/global_graph
           Name: FactorGraph
           Namespaces:
             global_graph_axes: true
@@ -715,7 +715,7 @@ Visualization Manager:
           Enabled: true
           Name: Prior_Predictions
           Queue Size: 100
-          Topic: /rolo/mapping/prior_predictions
+          Topic: /terra/mapping/prior_predictions
           Unreliable: false
           Value: true
           alpha: 0.800000011920929
@@ -789,7 +789,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.009999999776482582
       Style: Points
-      Topic: /rolo/mapping/prior_patches
+      Topic: /terra/mapping/prior_patches
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true

@@ -1,9 +1,9 @@
 #pragma once
-#ifndef ROLO_POSE_SOLVER_HPP_
-#define ROLO_POSE_SOLVER_HPP_
+#ifndef TERRA_POSE_SOLVER_HPP_
+#define TERRA_POSE_SOLVER_HPP_
 #define PCL_NO_PRECOMPILE
 
-#include "rolo/utility.h"
+#include "terra/utility.h"
 
 #include <sensor_msgs/PointCloud2.h>
 

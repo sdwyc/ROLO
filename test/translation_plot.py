@@ -20,7 +20,7 @@ def dataHandler(data):
         rospy.signal_shutdown()
 
 if __name__ == '__main__':
-    rospy.init_node("rolo_sam_plot", anonymous=False)
-    sub = rospy.Subscriber("rolo/data_test", Float64MultiArray, callback=dataHandler, queue_size=10)
+    rospy.init_node("terra_sam_plot", anonymous=False)
+    sub = rospy.Subscriber("terra/data_test", Float64MultiArray, callback=dataHandler, queue_size=10)
     plt.ion()
     rospy.spin()

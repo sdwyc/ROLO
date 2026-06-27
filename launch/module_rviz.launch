@@ -1,10 +1,10 @@
 <launch>
 
-    <arg name="project" default="rolo"/>
+    <arg name="project" default="terra"/>
 
     <!--- Run Rviz-->
-    <!-- <node pkg="rviz" type="rviz" name="$(arg project)_rviz" args="-d $(find rolo)/config/rviz/title_figure.rviz" /> -->
-    <node pkg="rviz" type="rviz" name="$(arg project)_rviz" args="-d $(find rolo)/config/rviz/rolo.rviz" />
-    <!-- <node pkg="rviz" type="rviz" name="$(arg project)_rviz_global" args="-d $(find rolo)/config/rviz/rolo_color.rviz" /> -->
+    <!-- <node pkg="rviz" type="rviz" name="$(arg project)_rviz" args="-d $(find terra)/config/rviz/title_figure.rviz" /> -->
+    <node pkg="rviz" type="rviz" name="$(arg project)_rviz" args="-d $(find terra)/config/rviz/terra.rviz" />
+    <!-- <node pkg="rviz" type="rviz" name="$(arg project)_rviz_global" args="-d $(find terra)/config/rviz/terra_color.rviz" /> -->
 
 </launch>

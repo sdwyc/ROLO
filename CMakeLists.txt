@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(rolo)
+project(terra)
 
 set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_FLAGS "-O3 -Wall -g")
@@ -70,7 +70,7 @@ if(EXISTS "${SMALL_GICP_PCL_HEADER}")
 # else()
 #   message(WARNING
 #     "small_gicp vendored repo was not found at ${SMALL_GICP_ROOT}. "
-#     "Clone https://github.com/koide3/small_gicp into src/ROLO/include before using the small_gicp PCL interface."
+#     "Clone https://github.com/koide3/small_gicp into src/TERRA/include before using the small_gicp PCL interface."
 #   )
 endif()
 

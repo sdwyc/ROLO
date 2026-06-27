@@ -12,7 +12,7 @@
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
 
-#include "rolo/eskf/eskf.hpp"
+#include "terra/eskf/eskf.hpp"
 
 class EskfOdomTestNode {
 public:
@@ -31,10 +31,10 @@ public:
 private:
   void loadParams() {
     pnh_.param<std::string>("input_topic", input_topic_, "/odometry/lidar_incremental");
-    pnh_.param<std::string>("raw_odom_topic", raw_odom_topic_, "/rolo/eskf/raw_odom");
-    pnh_.param<std::string>("filtered_odom_topic", filtered_odom_topic_, "/rolo/eskf/filtered_odom");
-    pnh_.param<std::string>("raw_path_topic", raw_path_topic_, "/rolo/eskf/raw_path");
-    pnh_.param<std::string>("filtered_path_topic", filtered_path_topic_, "/rolo/eskf/filtered_path");
+    pnh_.param<std::string>("raw_odom_topic", raw_odom_topic_, "/terra/eskf/raw_odom");
+    pnh_.param<std::string>("filtered_odom_topic", filtered_odom_topic_, "/terra/eskf/filtered_odom");
+    pnh_.param<std::string>("raw_path_topic", raw_path_topic_, "/terra/eskf/raw_path");
+    pnh_.param<std::string>("filtered_path_topic", filtered_path_topic_, "/terra/eskf/filtered_path");
     pnh_.param<std::string>("world_frame", world_frame_, std::string("odometry"));
     pnh_.param<std::string>("child_frame", child_frame_, std::string("eskf_lidar"));
     pnh_.param<std::string>("tf_parent_frame", tf_parent_frame_, std::string("odometry"));
@@ -43,7 +43,7 @@ private:
     pnh_.param<int>("max_path_size", max_path_size_, 10000);
     pnh_.param<bool>("use_input_covariance", use_input_covariance_, true);
 
-    rolo::eskf::PoseESEKF::Options options;
+    terra::eskf::PoseESEKF::Options options;
     pnh_.param<double>("max_dt", options.max_dt, options.max_dt);
     pnh_.param<double>("q_linear_jerk_std", options.q_linear_jerk_std, options.q_linear_jerk_std);
     pnh_.param<double>("q_angular_jerk_std", options.q_angular_jerk_std, options.q_angular_jerk_std);
@@ -69,7 +69,7 @@ private:
       msg->pose.pose.orientation.z
     );
 
-    rolo::eskf::PoseESEKF::MeasurementNoiseCov R = filter_.defaultMeasurementNoise();
+    terra::eskf::PoseESEKF::MeasurementNoiseCov R = filter_.defaultMeasurementNoise();
     if(use_input_covariance_) {
       fillMeasurementNoiseFromMsg(*msg, R);
     }
@@ -84,7 +84,7 @@ private:
     publishTf(*msg);
   }
 
-  void fillMeasurementNoiseFromMsg(nav_msgs::Odometry const& msg, rolo::eskf::PoseESEKF::MeasurementNoiseCov& R) {
+  void fillMeasurementNoiseFromMsg(nav_msgs::Odometry const& msg, terra::eskf::PoseESEKF::MeasurementNoiseCov& R) {
     bool valid = true;
     for(int i = 0; i < 6; i++) {
       double v = msg.pose.covariance[i * 6 + i];
@@ -219,7 +219,7 @@ private:
 
   nav_msgs::Path raw_path_;
   nav_msgs::Path filtered_path_;
-  rolo::eskf::PoseESEKF filter_;
+  terra::eskf::PoseESEKF filter_;
 };
 
 int main(int argc, char** argv) {

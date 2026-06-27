@@ -1,5 +1,5 @@
-#include "rolo/utility.h"
-#include "rolo/eskf/eskf.hpp"
+#include "terra/utility.h"
+#include "terra/eskf/eskf.hpp"
 #include "autoware_rviz_msgs/Path.h"
 #include "autoware_rviz_msgs/PathPoint.h"
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
@@ -76,7 +76,7 @@ public:
     nav_msgs::Odometry latestLidarOdomTemplate;
     nav_msgs::Path lidarPath;
     deque<nav_msgs::Odometry> lidarOdomQueue;
-    rolo::eskf::PoseESEKF pose_regulator;
+    terra::eskf::PoseESEKF pose_regulator;
     //! 读取base-lidar的TF，声明输入输出
     TransformFusion()
     {
@@ -93,11 +93,11 @@ public:
             }
         }
         // 接受后端优化里程和预积分传过来的历程
-        subMappingOdometry = nh.subscribe<nav_msgs::Odometry>("rolo/mapping/odometry", 5, &TransformFusion::mappingOdometryHandler, this, ros::TransportHints().tcpNoDelay());
+        subMappingOdometry = nh.subscribe<nav_msgs::Odometry>("terra/mapping/odometry", 5, &TransformFusion::mappingOdometryHandler, this, ros::TransportHints().tcpNoDelay());
         subLidarOdometry   = nh.subscribe<nav_msgs::Odometry>(odomTopic+"_incremental",   2000, &TransformFusion::lidarOdometryHandler,   this, ros::TransportHints().tcpNoDelay());
         // 发布融合里程计信息
         pubLidarOdometry   = nh.advertise<nav_msgs::Odometry>(odomTopic, 2000);
-        pubLidarPath       = nh.advertise<nav_msgs::Path>("rolo/lidar_odometry/path", 1);
+        pubLidarPath       = nh.advertise<nav_msgs::Path>("terra/lidar_odometry/path", 1);
         pubLidarSpeed      = nh.advertise<std_msgs::Float32>(odomTopic + "/speed", 2000);
         pubFuturePath      = nh.advertise<autoware_rviz_msgs::Path>("future_path", 1);
         pubFuturePoseLidar = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("future_pose_lidar", 1);
@@ -182,7 +182,7 @@ public:
         if(!pose_regulator.initialized())
             return;
 
-        rolo::eskf::PoseESEKF pose_preview = pose_regulator;
+        terra::eskf::PoseESEKF pose_preview = pose_regulator;
         // if(!has_new_lidar_odom)
         pose_preview.statePredict(stamp.toSec());
 
@@ -256,7 +256,7 @@ public:
         if(!pose_regulator.initialized())
             return;
 
-        rolo::eskf::PoseESEKF::PoseVectorList futurePoseList = pose_regulator.planarPropagate(0.2, 6.0);
+        terra::eskf::PoseESEKF::PoseVectorList futurePoseList = pose_regulator.planarPropagate(0.2, 6.0);
         if(futurePoseList.empty())
             return;
 
@@ -359,7 +359,7 @@ private:
     pcl::PointCloud<PointType>::Ptr RegCloud;
     
     // 当前帧数据
-    rolo::CloudInfoStamp laserCloudInfoLast;
+    terra::CloudInfoStamp laserCloudInfoLast;
     pcl::PointCloud<PointType>::Ptr FullCloudLast;
     pcl::PointCloud<PointType>::Ptr CloudCornerLast;
     pcl::PointCloud<PointType>::Ptr CloudSurfLast;
@@ -368,7 +368,7 @@ private:
     pcl::PointCloud<PointType>::Ptr featureLast;
 
     // 上一帧数据
-    rolo::CloudInfoStamp laserCloudInfoOld;
+    terra::CloudInfoStamp laserCloudInfoOld;
     pcl::PointCloud<PointType>::Ptr FullCloudOld;
     pcl::PointCloud<PointType>::Ptr CloudCornerOld;
     pcl::PointCloud<PointType>::Ptr CloudSurfOld;
@@ -376,7 +376,7 @@ private:
     pcl::PointCloud<PointType>::Ptr ground_and_cornerOld;
     pcl::PointCloud<PointType>::Ptr featureOld;
 
-    std::queue<rolo::CloudInfoStamp> laserCloudInfoBuf;
+    std::queue<terra::CloudInfoStamp> laserCloudInfoBuf;
     
     Matrix3d Rotation;
     Vector3d Translation;
@@ -393,16 +393,16 @@ public:
     {
 
         // mapOptimization传来的里程计数据
-        subOdometryMapped = nh.subscribe<nav_msgs::Odometry>("rolo/mapping/odometry", 10, &LidarOdometry::odometryHandler, this, ros::TransportHints().tcpNoDelay());
+        subOdometryMapped = nh.subscribe<nav_msgs::Odometry>("terra/mapping/odometry", 10, &LidarOdometry::odometryHandler, this, ros::TransportHints().tcpNoDelay());
         // 接受imu原始数据
-        subCloudInfo = nh.subscribe<rolo::CloudInfoStamp>("rolo/feature/cloud_info", 10, &LidarOdometry::cloudHandler, this, ros::TransportHints().tcpNoDelay());
+        subCloudInfo = nh.subscribe<terra::CloudInfoStamp>("terra/feature/cloud_info", 10, &LidarOdometry::cloudHandler, this, ros::TransportHints().tcpNoDelay());
         // 发布imu预测里程计
-        pubFrontCloudInfo = nh.advertise<rolo::CloudInfoStamp>(odomTopic+"/cloud_info", 2000);
+        pubFrontCloudInfo = nh.advertise<terra::CloudInfoStamp>(odomTopic+"/cloud_info", 2000);
         pubLidarOdometry = nh.advertise<nav_msgs::Odometry> (odomTopic+"_incremental", 2000);
         pubLidarPose = nh.advertise<geometry_msgs::PoseStamped> (odomTopic+"_incremental/pose", 2000);
         pubLaserPath = nh.advertise<nav_msgs::Path> (odomTopic+"_incremental/path", 2000);
         pubRegScan = nh.advertise<sensor_msgs::PointCloud2> (odomTopic+"/registration_scan", 10);
-        pubPlotData = nh.advertise<std_msgs::Float64MultiArray> ("rolo/data_test", 10);
+        pubPlotData = nh.advertise<std_msgs::Float64MultiArray> ("terra/data_test", 10);
         Init();
     }
     ~LidarOdometry(){}
@@ -500,7 +500,7 @@ public:
         Translation += Reg_translation;
     }
 
-    void cloudHandler(const rolo::CloudInfoStampConstPtr &cloudIn){
+    void cloudHandler(const terra::CloudInfoStampConstPtr &cloudIn){
         // 取时间戳,入buffer
         cloudTimeStamp = cloudIn->header.stamp;
         cloudTimeCur = cloudIn->header.stamp.toSec();
@@ -684,7 +684,7 @@ public:
         pubLidarOdometry.publish(laser_odom_incremental);
 
         // 发布初始位姿估计
-        rolo::CloudInfoStamp odometry_cloud;
+        terra::CloudInfoStamp odometry_cloud;
         odometry_cloud = laserCloudInfoLast;
         odometry_cloud.initialGuessX = LaserOdomPose[0];
         odometry_cloud.initialGuessY = LaserOdomPose[1];
@@ -714,7 +714,7 @@ public:
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "rolo");
+    ros::init(argc, argv, "terra");
     
     ROS_INFO("\033[1;32m----> Laser Odometry Started.\033[0m");
     LidarOdometry LO;

@@ -53,7 +53,7 @@ bool dst_handler(std_srvs::Empty::Request & req,
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "rolo_sam");
+    ros::init(argc, argv, "terra_sam");
     ros::NodeHandle nh;
     ros::ServiceServer src_server = nh.advertiseService("pub_src", src_handler);
     ros::ServiceServer dst_server = nh.advertiseService("pub_dst", dst_handler);

@@ -1,5 +1,5 @@
-#ifndef ROLO_ESKF_ESKF_HPP
-#define ROLO_ESKF_ESKF_HPP
+#ifndef TERRA_ESKF_ESKF_HPP
+#define TERRA_ESKF_ESKF_HPP
 
 #include <algorithm>
 #include <cmath>
@@ -9,10 +9,10 @@
 #include <Eigen/Geometry>
 #include <Eigen/StdVector>
 
-#include "rolo/eskf/IKFoM_toolkit/esekfom/esekfom.hpp"
-#include "rolo/utility.h"
+#include "terra/eskf/IKFoM_toolkit/esekfom/esekfom.hpp"
+#include "terra/utility.h"
 
-namespace rolo {
+namespace terra {
 namespace eskf {
 
 using Vec3 = MTK::vect<3, double>;
@@ -429,6 +429,6 @@ private:
 };
 
 }  // namespace eskf
-}  // namespace rolo
+}  // namespace terra
 
-#endif  // ROLO_ESKF_ESKF_HPP
+#endif  // TERRA_ESKF_ESKF_HPP
