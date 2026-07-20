@@ -22,17 +22,8 @@ float deg2rad(float degrees)
 
 float xy2theta( const float & _x, const float & _y )
 {
-    if ( (_x >= 0) & (_y >= 0)) 
-        return (180/M_PI) * atan(_y / _x);
-
-    if ( (_x < 0) & (_y >= 0)) 
-        return 180 - ( (180/M_PI) * atan(_y / (-_x)) );
-
-    if ( (_x < 0) & (_y < 0)) 
-        return 180 + ( (180/M_PI) * atan(_y / _x) );
-
-    if ( (_x >= 0) & (_y < 0))
-        return 360 - ( (180/M_PI) * atan((-_y) / _x) );
+    const float theta = rad2deg(std::atan2(_y, _x));
+    return theta < 0.0f ? theta + 360.0f : theta;
 } // xy2theta
 
 

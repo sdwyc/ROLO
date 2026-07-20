@@ -173,28 +173,28 @@ template <typename PointSource, typename PointTarget>
 void RotVGICP<PointSource, PointTarget>::update_correspondences(const Eigen::Isometry3d& trans) {
   voxel_correspondences_.clear();
   auto offsets = neighbor_offsets(search_method_);
-  // 多线程分块处理
-  std::vector<std::vector<std::pair<int, VmfVoxel::Ptr>>> corrs(num_threads_); // 第一维度是线程池
+  // Parallel chunk processing
+  std::vector<std::vector<std::pair<int, VmfVoxel::Ptr>>> corrs(num_threads_); // Per-thread correspondence bins
   for (auto& c : corrs) {
-    c.reserve((input_->size() * offsets.size()) / num_threads_); // 预分配空间（元素数）
+    c.reserve((input_->size() * offsets.size()) / num_threads_); // Reserve correspondence storage
   }
 
 #pragma omp parallel for num_threads(num_threads_) schedule(guided, 8)
-  for (int i = 0; i < input_->size(); i++) {
+  for (std::size_t i = 0; i < input_->size(); ++i) {
     const Eigen::Vector4d mean_A = input_->at(i).getVector4fMap().template cast<double>();
     Eigen::Vector4d transed_mean_A = trans * mean_A;
-    Eigen::Vector3i coord = voxel_type_ == VoxelType::POLAR ? voxelmap_->polar_coord(transed_mean_A) : voxelmap_->voxel_coord(transed_mean_A); // 取体素索引
+    Eigen::Vector3i coord = voxel_type_ == VoxelType::POLAR ? voxelmap_->polar_coord(transed_mean_A) : voxelmap_->voxel_coord(transed_mean_A); // Voxel index
 
     for (const auto& offset : offsets) {
-      auto voxel = voxelmap_->lookup_voxel(coord + offset); // 寻找该点周围的体素
+      auto voxel = voxelmap_->lookup_voxel(coord + offset); // Neighbor voxel lookup
       if (voxel != nullptr) {
-        corrs[omp_get_thread_num()].push_back(std::make_pair(i, voxel)); // 建立corrs对
+        corrs[omp_get_thread_num()].push_back(std::make_pair(i, voxel)); // Add voxel correspondence
       }
     }
   }
 
   voxel_correspondences_.reserve(input_->size() * offsets.size());
-  for (const auto& c : corrs) { // 将correspondence逐一添加到voxel_correspondences_
+  for (const auto& c : corrs) { // Add voxel correspondence
     voxel_correspondences_.insert(voxel_correspondences_.end(), c.begin(), c.end());
   }
 
@@ -202,19 +202,19 @@ void RotVGICP<PointSource, PointTarget>::update_correspondences(const Eigen::Iso
   voxel_mahalanobis_.resize(voxel_correspondences_.size());
 
 #pragma omp parallel for num_threads(num_threads_) schedule(guided, 8)
-  for (int i = 0; i < voxel_correspondences_.size(); i++) {
-    const auto& corr = voxel_correspondences_[i]; // 点的pcl索引：voxel
+  for (std::size_t i = 0; i < voxel_correspondences_.size(); ++i) {
+    const auto& corr = voxel_correspondences_[i]; // Point index and voxel pair
     const auto& cov_A = source_covs_[corr.first];
-    const auto& cov_B = corr.second->cov; // 取体素存储的协方差
-    // const auto& cov_B = corr.second->kappa; // 取体素存储的协方差
+    const auto& cov_B = corr.second->cov; // Voxel covariance
+    // const auto& cov_B = corr.second->kappa; // Voxel covariance
     // std::cout << "cov_A: " << cov_A << std::endl;
     // std::cout << "cov_B: " << cov_B << std::endl;
     // std::cout << "num: " << corr.second->num_points << std::endl;
 
-    // 计算B+TAT^{T}
+    // GICP covariance sum
     Eigen::Matrix4d RCR = cov_B + trans.matrix() * cov_A * trans.matrix().transpose();
     RCR(3, 3) = 1.0;
-    // mahalanobis-马氏距离
+    // Mahalanobis distance
     voxel_mahalanobis_[i] = RCR.inverse();
     voxel_mahalanobis_[i](3, 3) = 0.0;
     // std::cout << "voxel_mahalanobis_: " << voxel_mahalanobis_[i] << std::endl;
@@ -223,14 +223,14 @@ void RotVGICP<PointSource, PointTarget>::update_correspondences(const Eigen::Iso
 
 template <typename PointSource, typename PointTarget>
 double RotVGICP<PointSource, PointTarget>::linearize(const Eigen::Isometry3d& trans, Eigen::Matrix<double, 6, 6>* H, Eigen::Matrix<double, 6, 1>* b) {
-  // 若没有构建体素地图，先构建体素地图
+  // Build voxel map if needed
   if (voxelmap_ == nullptr) {
     voxelmap_.reset(new VmfVoxelMap<PointTarget>(voxel_resolution_, polar_resolution_, voxel_mode_, voxel_type_));
     voxelmap_->create_voxelmap(*target_, target_covs_);
   }
 
-  update_correspondences(trans); // 执行一次位姿更新后的correspondence
-  // 以下分别是总体误差，海森矩阵，偏置
+  update_correspondences(trans); // Update correspondences after pose change
+  // Hessian matrix
   double sum_errors = 0.0;
   std::vector<Eigen::Matrix<double, 6, 6>, Eigen::aligned_allocator<Eigen::Matrix<double, 6, 6>>> Hs(num_threads_);
   std::vector<Eigen::Matrix<double, 6, 1>, Eigen::aligned_allocator<Eigen::Matrix<double, 6, 1>>> bs(num_threads_);
@@ -240,36 +240,34 @@ double RotVGICP<PointSource, PointTarget>::linearize(const Eigen::Isometry3d& tr
   }
 
 #pragma omp parallel for num_threads(num_threads_) reduction(+ : sum_errors) schedule(guided, 8)
-  for (int i = 0; i < voxel_correspondences_.size(); i++) {
+  for (std::size_t i = 0; i < voxel_correspondences_.size(); ++i) {
     const auto& corr = voxel_correspondences_[i];
     auto target_voxel = corr.second;
 
     const Eigen::Vector4d mean_A = input_->at(corr.first).getVector4fMap().template cast<double>();
-    const auto& cov_A = source_covs_[corr.first]; // 取协方差矩阵  
 
-    const Eigen::Vector4d mean_B = corr.second->mean_dir; // 体素栅格内的均值和协方差
-    // const Eigen::Vector4d dir_B = mean_B.array().acos(); // 取方向余弦
-    const auto& cov_B = corr.second->cov;
+    const Eigen::Vector4d mean_B = corr.second->mean_dir; // Voxel mean and covariance
+    // const Eigen::Vector4d dir_B = mean_B.array().acos(); // Direction cosine
 
-    const Eigen::Vector4d transed_mean_A = trans * mean_A; // 变换点
-    // const Eigen::Vector4d dir_A = (transed_mean_A / transed_mean_A.norm()).array().acos();  // 取方向余弦
-    const Eigen::Vector4d error = mean_B - transed_mean_A; // 均值误差
+    const Eigen::Vector4d transed_mean_A = trans * mean_A; // Transform point
+    // const Eigen::Vector4d dir_A = (transed_mean_A / transed_mean_A.norm()).array().acos();  // Direction cosine
+    const Eigen::Vector4d error = mean_B - transed_mean_A; // Mean residual
 
-    double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
-    sum_errors += w * error.transpose() * voxel_mahalanobis_[i] * error; // 残差计算
+    double w = std::sqrt(target_voxel->num_points); // Denser voxels get higher weight
+    sum_errors += w * error.transpose() * voxel_mahalanobis_[i] * error; // Residual computation
 
     if (H == nullptr || b == nullptr) {
       continue;
     }
-    // 利用李代数扰动模型，对位姿进行求导，得到雅可比矩阵
+    // Pose Jacobian from Lie perturbation
     Eigen::Matrix<double, 4, 6> dtdx0 = Eigen::Matrix<double, 4, 6>::Zero();
     dtdx0.block<3, 3>(0, 0) = skewd(transed_mean_A.head<3>());
     dtdx0.block<3, 3>(0, 3) = -Eigen::Matrix3d::Identity();
 
-    Eigen::Matrix<double, 4, 6> jlossexp = dtdx0; // 雅可比矩阵
-    // 海森矩阵
+    Eigen::Matrix<double, 4, 6> jlossexp = dtdx0; // Jacobian matrix
+    // Hessian matrix
     Eigen::Matrix<double, 6, 6> Hi = w * jlossexp.transpose() * voxel_mahalanobis_[i] * jlossexp;
-    // 偏置
+    // Gradient vector
     Eigen::Matrix<double, 6, 1> bi = w * jlossexp.transpose() * voxel_mahalanobis_[i] * error;
 
     int thread_num = omp_get_thread_num();
@@ -291,7 +289,7 @@ double RotVGICP<PointSource, PointTarget>::linearize(const Eigen::Isometry3d& tr
 
 template <typename PointSource, typename PointTarget>
 double RotVGICP<PointSource, PointTarget>::so3_linearize(const Eigen::Isometry3d& trans, Eigen::Matrix<double, 3, 3>* H, Eigen::Matrix<double, 3, 1>* b) {
-  // 若没有构建体素地图，先构建体素地图
+  // Build voxel map if needed
   if (voxelmap_ == nullptr) {
     voxelmap_.reset(new VmfVoxelMap<PointTarget>(voxel_resolution_, polar_resolution_, voxel_mode_, voxel_type_));
     voxelmap_->create_voxelmap(*target_, target_covs_);
@@ -300,8 +298,8 @@ double RotVGICP<PointSource, PointTarget>::so3_linearize(const Eigen::Isometry3d
   // std::cout << target_covs_[0] << std::endl;
   // std::cout << "trans: " << trans.matrix() << std::endl;
 
-  update_correspondences(trans); // 执行一次位姿更新后的correspondence
-  // 以下分别是总体误差，海森矩阵，偏置
+  update_correspondences(trans); // Update correspondences after pose change
+  // Hessian matrix
   double sum_errors = 0.0;
   std::vector<Eigen::Matrix<double, 3, 3>, Eigen::aligned_allocator<Eigen::Matrix<double, 3, 3>>> Hs(num_threads_);
   std::vector<Eigen::Matrix<double, 3, 1>, Eigen::aligned_allocator<Eigen::Matrix<double, 3, 1>>> bs(num_threads_);
@@ -311,28 +309,27 @@ double RotVGICP<PointSource, PointTarget>::so3_linearize(const Eigen::Isometry3d
   }
 
 #pragma omp parallel for num_threads(num_threads_) reduction(+ : sum_errors) schedule(guided, 8)
-  for (int i = 0; i < voxel_correspondences_.size(); i++) {
+  for (std::size_t i = 0; i < voxel_correspondences_.size(); ++i) {
     const auto& corr = voxel_correspondences_[i];
     auto target_voxel = corr.second;
 
     const Eigen::Vector4d mean_A = input_->at(corr.first).getVector4fMap().template cast<double>();
     // std::cout << "mean_A" << mean_A << std::endl;
-    const auto& cov_A = source_covs_[corr.first]; // 取协方差矩阵  
 
-    const Eigen::Vector4d mean_B = corr.second->mean_dir; // 体素栅格内的均值和协方差
+    const Eigen::Vector4d mean_B = corr.second->mean_dir; // Voxel mean and covariance
     // const auto& cov_B = corr.second->cov;
-    const Eigen::Vector4d transed_mean_A = trans * mean_A; // 变换点
-    const Eigen::Vector4d error = mean_B - transed_mean_A; // 均值误差
+    const Eigen::Vector4d transed_mean_A = trans * mean_A; // Transform point
+    const Eigen::Vector4d error = mean_B - transed_mean_A; // Mean residual
 
     // Eigen::Vector4d mean_A_dir;
     // mean_A_dir << mean_A.head<3>().normalized(), 1.0;
-    // const Eigen::Vector4d mean_B_dir = corr.second->dir_reg; // 取方向余弦
-    // const Eigen::Vector4d transed_mean_A = trans * mean_A_dir; // 变换点
-    // const Eigen::Vector4d error = mean_B_dir - transed_mean_A;  // 旋转误差
+    // const Eigen::Vector4d mean_B_dir = corr.second->dir_reg; // Direction cosine
+    // const Eigen::Vector4d transed_mean_A = trans * mean_A_dir; // Transform point
+    // const Eigen::Vector4d error = mean_B_dir - transed_mean_A;  // Direction cosine residual
 
-    double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
-    // double w = target_voxel->kappa; // 体素内点越密集，权重越大
-    sum_errors += w * error.transpose() * voxel_mahalanobis_[i] * error; // 残差计算
+    double w = std::sqrt(target_voxel->num_points); // Denser voxels get higher weight
+    // double w = target_voxel->kappa; // Denser voxels get higher weight
+    sum_errors += w * error.transpose() * voxel_mahalanobis_[i] * error; // Residual computation
 
     if (H == nullptr || b == nullptr) {
       continue;
@@ -341,13 +338,13 @@ double RotVGICP<PointSource, PointTarget>::so3_linearize(const Eigen::Isometry3d
     // std::cout << "transed_mean_A" << transed_mean_A << std::endl;  
     // std::cout << "voxel_mahalanobis_so3" << voxel_mahalanobis_[i] << std::endl;  
 
-    // 利用李代数扰动模型，对位姿进行求导，得到雅可比矩阵
+    // Pose Jacobian from Lie perturbation
     Eigen::Matrix<double, 3, 3> dtdx0 = Eigen::Matrix<double, 3, 3>::Zero();
     // std::cout << "transed_mean_A: " << transed_mean_A << std::endl; 
     dtdx0 = skewd(transed_mean_A.head<3>());
     // dtdx0.block<3, 3>(0, 3) = -Eigen::Matrix3d::Identity();
 
-    Eigen::Matrix<double, 3, 3> jlossexp = dtdx0; // 雅可比矩阵
+    Eigen::Matrix<double, 3, 3> jlossexp = dtdx0; // Jacobian matrix
     Eigen::Matrix3d voxel_mahalanobis_so3 = voxel_mahalanobis_[i].block<3,3>(0,0).matrix();
     // std::cout << "dtdx0" << dtdx0 << std::endl;
     // std::cout << "voxel_mahalanobis_so3" << voxel_mahalanobis_so3 << std::endl;
@@ -360,9 +357,9 @@ double RotVGICP<PointSource, PointTarget>::so3_linearize(const Eigen::Isometry3d
       std::cout << "target_voxel->mean_dir: " << target_voxel->mean_dir << std::endl;
     }
 
-    // 海森矩阵
+    // Hessian matrix
     Eigen::Matrix<double, 3, 3> Hi = w * jlossexp.transpose() * voxel_mahalanobis_so3 * jlossexp;
-    // 偏置
+    // Gradient vector
     Eigen::Matrix<double, 3, 1> bi = w * jlossexp.transpose() * voxel_mahalanobis_so3 * error.head<3>();
     // std::cout << "Hi" << Hi << std::endl;  
     // std::cout << "bi" << bi << std::endl;  
@@ -386,31 +383,30 @@ double RotVGICP<PointSource, PointTarget>::so3_linearize(const Eigen::Isometry3d
 
   return sum_errors;
 }
-// //! 计算残差块
+// //! Residual computation
 template <typename PointSource, typename PointTarget>
 double RotVGICP<PointSource, PointTarget>::compute_error(const Eigen::Isometry3d& trans) {
   double sum_errors = 0.0;
 #pragma omp parallel for num_threads(num_threads_) reduction(+ : sum_errors)
-  for (int i = 0; i < voxel_correspondences_.size(); i++) {
+  for (std::size_t i = 0; i < voxel_correspondences_.size(); ++i) {
     const auto& corr = voxel_correspondences_[i];
     auto target_voxel = corr.second;
 
     const Eigen::Vector4d mean_A = input_->at(corr.first).getVector4fMap().template cast<double>();
     Eigen::Vector4d mean_A_dir;
     mean_A_dir << mean_A.head<3>().normalized(), 1.0;
-    const auto& cov_A = source_covs_[corr.first]; // 取协方差矩阵  
     
-    // const Eigen::Vector4d mean_B_dir = corr.second->dir_reg; // 体素栅格内的均值和协方差
-    // const Eigen::Vector4d transed_mean_A = trans * mean_A_dir; // 变换点
-    // const Eigen::Vector4d error = mean_B_dir - transed_mean_A; // 均值误差
+    // const Eigen::Vector4d mean_B_dir = corr.second->dir_reg; // Voxel mean and covariance
+    // const Eigen::Vector4d transed_mean_A = trans * mean_A_dir; // Transform point
+    // const Eigen::Vector4d error = mean_B_dir - transed_mean_A; // Mean residual
 
     const Eigen::Vector4d mean_B = corr.second->mean_dir;
-    const Eigen::Vector4d transed_mean_A = trans * mean_A; // 变换点
-    const Eigen::Vector4d error = mean_B - transed_mean_A; // 均值误差
+    const Eigen::Vector4d transed_mean_A = trans * mean_A; // Transform point
+    const Eigen::Vector4d error = mean_B - transed_mean_A; // Mean residual
 
-    double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
-    // double w = target_voxel->kappa; // 体素内点越密集，权重越大
-    sum_errors += w * error.transpose() * voxel_mahalanobis_[i] * error; // 残差计算
+    double w = std::sqrt(target_voxel->num_points); // Denser voxels get higher weight
+    // double w = target_voxel->kappa; // Denser voxels get higher weight
+    sum_errors += w * error.transpose() * voxel_mahalanobis_[i] * error; // Residual computation
   }
 
   return sum_errors;
@@ -428,28 +424,28 @@ bool RotVGICP<PointSource, PointTarget>::calculate_covariances(
   covariances.resize(cloud->size());
 
 #pragma omp parallel for num_threads(num_threads_) schedule(guided, 8)
-  for (int i = 0; i < cloud->size(); i++) { // 为每个输入点云计算协方差
+  for (std::size_t i = 0; i < cloud->size(); ++i) { // Compute covariance per input point
     std::vector<int> k_indices;
-    std::vector<float> k_sq_distances;  // 利用kdtree 寻找最近的k_correspondences_个点
+    std::vector<float> k_sq_distances;  // Find nearest neighbors with KD-tree
     // std::cout << "size: " << cloud->size() << ", index: " << i << std::endl;
     // std::cout << "point: " << cloud->at(i).x << ", " << cloud->at(i).y << ", " << cloud->at(i).z << std::endl;
     kdtree.nearestKSearch(cloud->at(i), k_correspondences_, k_indices, k_sq_distances);
 
     Eigen::Matrix<double, 4, -1> neighbors(4, k_correspondences_);
-    for (int j = 0; j < k_indices.size(); j++) {  // 存的是方向余弦
+    for (std::size_t j = 0; j < k_indices.size(); ++j) {  // Direction cosine sample
       Eigen::Vector4d neibor = cloud->at(k_indices[j]).getVector4fMap().template cast<double>();
-      // neibor /= neibor.head<3>().norm(); // 归一化
+      // neibor /= neibor.head<3>().norm(); // Normalize point direction
       // neibor(3) = 1.0;
       neighbors.col(j) = neibor;
     }
-    // // 以第i个点为平均方向，求其他角的方向余弦插值
+    // // Direction cosine
     // Eigen::Vector4d mean_dir = cloud->at(i).getVector4fMap().template cast<double>().normalized().acos();
-    // 利用矢量和求平均方向向量
+    // Average direction vector
     // Eigen::Vector4d mean_dir = neighbors.rowwise().sum();
-    // mean_dir /= mean_dir.head<3>().norm(); // 单位化
-    // mean_dir(3) = 1.0; // se(3)影响
+    // mean_dir /= mean_dir.head<3>().norm(); // Normalize point direction
+    // mean_dir(3) = 1.0; // Mean dir
     // mean_dir = mean_dir.array().acos().eval();
-    // // 协方差公式： dir-bar(dir)/K, bar(dir)是neibor的平均方向
+    // // Average direction vector
     // neighbors.colwise() -= mean_dir; // P-bar(P)
     neighbors.colwise() -= neighbors.rowwise().mean().eval(); // P-bar(P)
 
@@ -464,7 +460,7 @@ bool RotVGICP<PointSource, PointTarget>::calculate_covariances(
       covariances[i].setZero();
       covariances[i].template block<3, 3>(0, 0) = (C_inv / C_inv.norm()).inverse();
     } else {
-      // SVD分解
+      // SVD decomposition
       Eigen::JacobiSVD<Eigen::Matrix3d> svd(cov.block<3, 3>(0, 0), Eigen::ComputeFullU | Eigen::ComputeFullV);
       Eigen::Vector3d values;
 
@@ -473,7 +469,7 @@ bool RotVGICP<PointSource, PointTarget>::calculate_covariances(
           std::cerr << "here must not be reached" << std::endl;
           abort();
         case RegularizationMethod::PLANE:
-          values = Eigen::Vector3d(1, 1, 1e-3); // 利用SVD矩阵将协方差降维到2维xy平面上
+          values = Eigen::Vector3d(1, 1, 1e-3); // Project covariance to xy plane
           break;
         case RegularizationMethod::MIN_EIG:
           values = svd.singularValues().array().max(1e-3);
@@ -499,7 +495,7 @@ template <typename PointSource, typename PointTarget>
 double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& trans, const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
                                                         const double interval_tn, const double interval_tn_1,
                                                         Eigen::Matrix<double, 6, 6>* H, Eigen::Matrix<double, 6, 1>* b) {
-  // 若没有构建体素地图，先构建体素地图
+  // Build voxel map if needed
   // if (voxelmap_ == nullptr) {
   //   voxelmap_.reset(new VmfVoxelMap<PointTarget>(voxel_resolution_, voxel_mode_));
   //   voxelmap_->create_voxelmap(*target_, target_covs_);
@@ -520,14 +516,13 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
   size_t pt_size = voxel_correspondences_.size();
 
 #pragma omp parallel for num_threads(num_threads_) reduction(+ : sum_errors) schedule(guided, 8)
-  for (int i = 0; i < voxel_correspondences_.size(); i++) {
+  for (std::size_t i = 0; i < voxel_correspondences_.size(); ++i) {
     const auto& corr = voxel_correspondences_[i];
     auto target_voxel = corr.second;
 
     const Eigen::Vector4d mean_A = input_->at(corr.first).getVector4fMap().template cast<double>();
-    const auto& cov_A = source_covs_[corr.first]; // 取协方差矩阵  
 
-    const Eigen::Vector4d mean_B = corr.second->mean_dir; // 体素栅格内的均值和协方差
+    const Eigen::Vector4d mean_B = corr.second->mean_dir; // Voxel mean and covariance
 
     Eigen::Isometry3d transform = Eigen::Isometry3d::Identity();
     transform(0,3) =  trans(0);
@@ -539,19 +534,18 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
     Eigen::Vector4d last_transform = Eigen::Vector4d::Zero();
     last_transform.matrix().col(3).head<3>() = last_t0;
 
-    const Eigen::Vector4d transed_mean_A = transform * mean_A; // 变换点
+    const Eigen::Vector4d transed_mean_A = transform * mean_A; // Transform point
 
-    const Eigen::Vector4d begin_mean_A = propagation_transform.inverse() * mean_A; // 找到插值前的点
+    const Eigen::Vector4d begin_mean_A = propagation_transform.inverse() * mean_A; // Pre-interpolation point
 
-    const Eigen::Vector4d error = mean_B - transed_mean_A; // 均值误差
+    const Eigen::Vector4d error = mean_B - transed_mean_A; // Mean residual
 
     const Eigen::Vector4d ct_error = (begin_mean_A - transed_mean_A)/interval_tn - last_transform/interval_tn_1;
 
-    double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
-    // double w = target_voxel->kappa; // 体素内点越密集，权重越大
-    const Eigen::Vector3d C_vel = (init_guess+trans)/interval_tn - last_t0/interval_tn_1;
+    double w = std::sqrt(target_voxel->num_points); // Denser voxels get higher weight
+    // double w = target_voxel->kappa; // Denser voxels get higher weight
     // double iter_error = w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda/pt_size * C_vel.transpose()*C_vel).value();
-    // sum_errors += iter_error; // 残差计算
+    // sum_errors += iter_error; // Residual computation
     sum_errors += w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda_/pt_size * ct_error.transpose() * voxel_mahalanobis_[i] * ct_error).value();
 
     if (H == nullptr || b == nullptr) {
@@ -560,7 +554,6 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
 
     // std::cout << "transed_mean_A" << transed_mean_A << std::endl;  
     // std::cout << "voxel_mahalanobis_so3" << voxel_mahalanobis_[i] << std::endl;  
-    Eigen::Matrix3d voxel_mahalanobis_so3 = voxel_mahalanobis_[i].block<3,3>(0,0).matrix();
   
     if(std::isnan(w)){
       std::cout << "target_voxel->num_points: " << target_voxel->num_points << std::endl;
@@ -570,17 +563,17 @@ double RotVGICP<PointSource, PointTarget>::t3_linearize(const Eigen::Vector3d& t
       std::cout << "target_voxel->mean_dir: " << target_voxel->mean_dir << std::endl;
     }
 
-    // 利用李代数扰动模型，对位姿进行求导，得到雅可比矩阵
+    // Pose Jacobian from Lie perturbation
     Eigen::Matrix<double, 4, 6> dtdx0 = Eigen::Matrix<double, 4, 6>::Zero();
     dtdx0.block<3, 3>(0, 0) = skewd(transed_mean_A.head<3>());
     dtdx0.block<3, 3>(0, 3) = -Eigen::Matrix3d::Identity();
 
-    Eigen::Matrix<double, 4, 6> jlossexp1 = dtdx0; // 雅可比矩阵
-    Eigen::Matrix<double, 4, 6> jlossexp2 = 1.0 / interval_tn * dtdx0; // 雅可比矩阵
+    Eigen::Matrix<double, 4, 6> jlossexp1 = dtdx0; // Jacobian matrix
+    Eigen::Matrix<double, 4, 6> jlossexp2 = 1.0 / interval_tn * dtdx0; // Jacobian matrix
 
-    // 海森矩阵
+    // Hessian matrix
     Eigen::Matrix<double, 6, 6> Hi = w * (jlossexp1.transpose() * voxel_mahalanobis_[i] * jlossexp1 + lambda_/pt_size * jlossexp2.transpose() * voxel_mahalanobis_[i] * jlossexp2);
-    // 偏置
+    // Gradient vector
     Eigen::Matrix<double, 6, 1> bi = w * (jlossexp1.transpose() * voxel_mahalanobis_[i] * error + lambda_/pt_size * jlossexp2.transpose() * voxel_mahalanobis_[i] * ct_error);
     // std::cout << "Hi" << Hi << std::endl;  
     // std::cout << "bi" << bi << std::endl;  
@@ -618,14 +611,13 @@ double RotVGICP<PointSource, PointTarget>::compute_t_error(const Eigen::Vector3d
   size_t pt_size = voxel_correspondences_.size();
 
 #pragma omp parallel for num_threads(num_threads_) reduction(+ : sum_errors)
-  for (int i = 0; i < voxel_correspondences_.size(); i++) {
+  for (std::size_t i = 0; i < voxel_correspondences_.size(); ++i) {
     const auto& corr = voxel_correspondences_[i];
     auto target_voxel = corr.second;
 
     const Eigen::Vector4d mean_A = input_->at(corr.first).getVector4fMap().template cast<double>();
-    const auto& cov_A = source_covs_[corr.first]; // 取协方差矩阵  
 
-    const Eigen::Vector4d mean_B = corr.second->mean_dir; // 体素栅格内的均值和协方差
+    const Eigen::Vector4d mean_B = corr.second->mean_dir; // Voxel mean and covariance
 
     Eigen::Isometry3d transform = Eigen::Isometry3d::Identity();
     transform(0,3) =  trans(0);
@@ -637,19 +629,18 @@ double RotVGICP<PointSource, PointTarget>::compute_t_error(const Eigen::Vector3d
     Eigen::Vector4d last_transform = Eigen::Vector4d::Identity();
     last_transform.matrix().col(3).head<3>() = last_t0;
 
-    const Eigen::Vector4d transed_mean_A = transform * mean_A; // 变换点
+    const Eigen::Vector4d transed_mean_A = transform * mean_A; // Transform point
 
-    const Eigen::Vector4d begin_mean_A = propagation_transform.inverse() * mean_A; // 找到插值前的点
+    const Eigen::Vector4d begin_mean_A = propagation_transform.inverse() * mean_A; // Pre-interpolation point
 
-    const Eigen::Vector4d error = mean_B - transed_mean_A; // 均值误差
+    const Eigen::Vector4d error = mean_B - transed_mean_A; // Mean residual
 
     const Eigen::Vector4d ct_error = (begin_mean_A - transed_mean_A)/interval_tn - last_transform/interval_tn_1;
 
-    double w = std::sqrt(target_voxel->num_points); // 体素内点越多且越密集，权重越大
-    // double w = target_voxel->kappa; // 体素内点越密集，权重越大
-    const Eigen::Vector3d C_vel = (init_guess+trans)/interval_tn - last_t0/interval_tn_1;
+    double w = std::sqrt(target_voxel->num_points); // Denser voxels get higher weight
+    // double w = target_voxel->kappa; // Denser voxels get higher weight
     // double iter_error = w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda/pt_size * C_vel.transpose()*C_vel).value();
-    // sum_errors += iter_error; // 残差计算
+    // sum_errors += iter_error; // Residual computation
     sum_errors += w * (error.transpose() * voxel_mahalanobis_[i] * error + lambda_/pt_size * ct_error.transpose() * voxel_mahalanobis_[i] * ct_error).value();
 
   }

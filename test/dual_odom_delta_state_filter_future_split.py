@@ -36,8 +36,8 @@ def wrap_vec_angles(vec, angle_idx):
 
 def quat_to_ypr(quat_xyzw):
     """
-    返回 yaw, pitch, roll
-    tf 的 euler_from_quaternion 返回 roll, pitch, yaw
+    Return yaw, pitch, roll.
+    tf euler_from_quaternion returns roll, pitch, yaw.
     """
     roll, pitch, yaw = euler_from_quaternion(quat_xyzw)
     return yaw, pitch, roll
@@ -45,7 +45,7 @@ def quat_to_ypr(quat_xyzw):
 
 def ypr_to_quat(yaw, pitch, roll):
     """
-    tf 的 quaternion_from_euler 输入顺序是 roll, pitch, yaw
+    tf quaternion_from_euler expects roll, pitch, yaw.
     """
     q = quaternion_from_euler(roll, pitch, yaw)
     return np.array([q[0], q[1], q[2], q[3]], dtype=float)
@@ -85,12 +85,12 @@ def delta_to_rate(delta, dt):
 
 def compute_relative_delta(prev_position, prev_orientation, curr_position, curr_orientation):
     """
-    计算相邻两帧之间的相对变换（局部坐标系）：
+    Compute the relative transform between adjacent frames in the local frame:
 
         Delta = [dx_local, dy_local, dz_local, dyaw, dpitch, droll]
 
-    这里的平移是在 prev pose 的局部坐标系里表达，
-    旋转是 q_rel = q_prev^{-1} * q_curr 再转成 yaw/pitch/roll 增量。
+    Translation is expressed in the local frame of prev pose.
+    Rotation is q_rel = q_prev^{-1} * q_curr, then converted to yaw/pitch/roll deltas.
     """
     prev_position = np.asarray(prev_position, dtype=float)
     curr_position = np.asarray(curr_position, dtype=float)
@@ -118,11 +118,11 @@ def compute_relative_delta(prev_position, prev_orientation, curr_position, curr_
 
 def apply_local_delta_to_pose(position, orientation, delta):
     """
-    把局部增量 Delta 施加到当前 pose 上：
+    Apply local Delta to the current pose:
 
         T_new = T_old * T_delta
 
-    其中 delta 的平移在 old pose 的局部坐标系里表达。
+    Delta translation is expressed in the old pose local frame.
     """
     position = np.asarray(position, dtype=float)
     orientation = normalize_quat(orientation)
@@ -189,24 +189,24 @@ def odom_msg_to_measurement(msg, source):
 
 class DeltaStateKalmanFilter(object):
     """
-    状态定义（12 维）：
+    State definition (12D):
         x = [dx, dy, dz, dyaw, dpitch, droll,
              ddx, ddy, ddz, ddyaw, ddpitch, ddroll]
 
-    含义：
-    - 前 6 维：当前这一小段“相邻两帧之间的相对变换 Delta”
-    - 后 6 维：Delta 的导数 Delta_dot
+    Meaning:
+    - First 6D: relative transform Delta for the current frame interval.
+    - Last 6D: derivative Delta_dot.
 
-    控制输入（6 维）：
+    Control input (6D):
         u = Delta_dot
 
-    观测（6 维）：
+    Measurement (6D):
         z = Delta
 
-    这正对应用户要求：
-    - 状态 = “两帧之间的变换 + 变换导数”
-    - 控制 = “变化量的导数”
-    - 位姿输出 = 由滤波后的 Delta 逐步迭代累积得到
+    Matches the requested model:
+    - State = inter-frame transform plus its derivative.
+    - Control = derivative of the change.
+    - Pose output = accumulated filtered Delta.
     """
     def __init__(self, Q, R_front, R_back, control_alpha=0.85, cov_min_eig=1e-9):
         self.n = 12
@@ -326,23 +326,23 @@ class DualOdomDeltaStateNode(object):
         self.publish_use_now_stamp = rospy.get_param("~publish_use_now_stamp", True)
         self.publish_predict_to_now = rospy.get_param("~publish_predict_to_now", True)
 
-        # 未来预测发布参数
+        # Future prediction publish params
         # 1) publish_predict_extra_sec:
-        #    在“当前发布基准时刻”之上，再额外向未来预测多少秒。
+        #    Extra seconds to predict beyond the current publish reference time.
         # 2) publish_predict_distance:
-        #    如果 > 0，则继续向未来预测，直到预测位置相对“当前发布基准位置”的直线距离
-        #    大于等于该阈值（米）为止。
-        # 3) 如果 extra_sec 和 distance 同时开启，则取满足二者的更大预测时长。
+        #    If > 0, keep predicting until the straight-line distance from the
+        #    current publish reference position reaches this threshold in meters.
+        # 3) If both extra_sec and distance are enabled, use the larger horizon.
         self.publish_predict_extra_sec = rospy.get_param("~publish_predict_extra_sec", 1)
         self.publish_predict_distance = rospy.get_param("~publish_predict_distance", 8)
         self.publish_predict_step_sec = rospy.get_param("~publish_predict_step_sec", 0.1)
         self.publish_predict_max_sec = rospy.get_param("~publish_predict_max_sec", 50.0)
 
-        # 未来预测输出参数
-        # 设计目标：
-        # 1) /fused_odom 仍然只表示“预测到现在”的全局 odom，不再承载未来目标
-        # 2) 额外发布未来目标的全局 odom
-        # 3) 再把这个未来全局目标转换成“以当前时刻为原点”的局部 odom 发布
+        # Future prediction output params
+        # Design goals:
+        # 1) /fused_odom only represents the global odom predicted to now.
+        # 2) Publish an additional future target global odom.
+        # 3) Convert that future global target to local odom anchored at now.
         self.future_global_output_topic = rospy.get_param("~future_global_output_topic", "/fused_odom_future_global")
         self.publish_future_global_odom = rospy.get_param("~publish_future_global_odom", True)
 
@@ -351,7 +351,7 @@ class DualOdomDeltaStateNode(object):
         self.future_local_child_frame = rospy.get_param("~future_local_child_frame", self.child_frame + "_future")
         self.publish_future_local_odom = rospy.get_param("~publish_future_local_odom", True)
 
-        # 可视化 topic
+        # Visualization topics
         self.marker_topic = rospy.get_param("~marker_topic", "/fused_odom_marker")
         self.future_global_marker_topic = rospy.get_param("~future_global_marker_topic", "/fused_odom_future_global_marker")
         self.future_local_marker_topic = rospy.get_param("~future_local_marker_topic", "/fused_odom_future_local_marker")
@@ -384,31 +384,31 @@ class DualOdomDeltaStateNode(object):
         # -------------------------
         # noise params
         # -------------------------
-        # 状态过程噪声：Delta 与 Delta_dot
+        # State process noise: Delta and Delta_dot
         q_delta_pos = rospy.get_param("~q_delta_pos", rospy.get_param("~q_pos", 0.02))
         q_delta_ang = rospy.get_param("~q_delta_ang", rospy.get_param("~q_ang", 0.02))
         q_rate_pos = rospy.get_param("~q_rate_pos", rospy.get_param("~q_vel", 0.10))
         q_rate_ang = rospy.get_param("~q_rate_ang", rospy.get_param("~q_yaw_rate", 0.05))
 
-        # 观测噪声：front/back 的相对变换 Delta
+        # Measurement noise: front/back relative transform Delta
         r_front_delta_pos = rospy.get_param("~r_front_delta_pos", rospy.get_param("~r_front_pos", 0.20))
         r_front_delta_ang = rospy.get_param("~r_front_delta_ang", rospy.get_param("~r_front_ang", 0.10))
         r_back_delta_pos = rospy.get_param("~r_back_delta_pos", rospy.get_param("~r_back_pos", 0.08))
         r_back_delta_ang = rospy.get_param("~r_back_delta_ang", rospy.get_param("~r_back_ang", 0.05))
 
-        # 局部增量状态初值协方差
+        # Initial local delta-state covariance
         init_delta_pos_std = rospy.get_param("~init_delta_pos_std", 0.05)
         init_delta_ang_std = rospy.get_param("~init_delta_ang_std", 0.05)
         init_rate_pos_std = rospy.get_param("~init_rate_pos_std", 0.50)
         init_rate_ang_std = rospy.get_param("~init_rate_ang_std", 0.30)
 
-        # 每次把增量 Delta 提交到全局 pose 之后，需要把本地 Delta 状态清零重新开始
+        # Reset local Delta after committing it to the global pose.
         reset_delta_pos_std = rospy.get_param("~reset_delta_pos_std", 0.01)
         reset_delta_ang_std = rospy.get_param("~reset_delta_ang_std", 0.01)
         reset_rate_pos_inflate_std = rospy.get_param("~reset_rate_pos_inflate_std", 0.02)
         reset_rate_ang_inflate_std = rospy.get_param("~reset_rate_ang_inflate_std", 0.02)
 
-        # 全局 pose 初始协方差（第一次用 front 初始化世界 pose 时）
+        # Initial global pose covariance when front first initializes the world pose.
         init_global_pos_std = rospy.get_param("~init_global_pos_std", 0.50)
         init_global_ang_std = rospy.get_param("~init_global_ang_std", 0.30)
 
@@ -470,7 +470,7 @@ class DualOdomDeltaStateNode(object):
         self.last_front_raw_meas = None
         self.last_back_raw_meas = None
 
-        # pending back: 只缓存一条最新、未消费的 back 增量导数
+        # Pending back: keep only the latest unconsumed back delta derivative.
         self.pending_back_meas = None
         self.pending_back_delta_rate = None
         self.last_back_consumed_stamp = None
@@ -479,11 +479,11 @@ class DualOdomDeltaStateNode(object):
         self.filter_time = None
         self.last_pub_time = None
 
-        # 局部增量滤波器状态（每个 front step 提交后会 reset）
+        # Local delta filter state, reset after each committed front step.
         self.x = np.zeros(12, dtype=float)
         self.P = np.array(self.init_local_P, dtype=float)
 
-        # 全局输出 pose：由滤波后的 Delta 逐步迭代出来
+        # Global output pose accumulated from filtered Delta.
         self.global_position = np.zeros(3, dtype=float)
         self.global_orientation = np.array([0.0, 0.0, 0.0, 1.0], dtype=float)
         self.global_pose_cov = np.array(self.init_global_pose_cov, dtype=float)
@@ -614,8 +614,8 @@ class DualOdomDeltaStateNode(object):
 
     def _commit_fused_delta(self):
         """
-        把当前局部滤波后的 Delta 提交到全局 pose，
-        然后把局部 Delta 清零，保留 Delta_dot 进入下一小段。
+        Commit the current filtered local Delta to the global pose,
+        then reset local Delta while keeping Delta_dot for the next segment.
         """
         delta_fused = self.x[0:6].copy()
         rate_fused = self.x[6:12].copy()
@@ -662,7 +662,7 @@ class DualOdomDeltaStateNode(object):
                 np.asarray(P_ref, dtype=float).copy(),
             )
 
-        # 只做发布临时预测，不污染内部状态
+        # Temporary publish prediction only; do not modify internal state.
         x_pub, P_pub = self.kf.predict(x_ref, P_ref, dt_future, u=None)
         delta_pub = x_pub[0:6].copy()
 
@@ -796,7 +796,7 @@ class DualOdomDeltaStateNode(object):
         if age_scale < 1.0:
             age_scale = 1.0
 
-        # 用 back 的 Delta_dot 同步到“当前 front 这一小段”的 Delta 观测
+        # Sync back Delta_dot into the Delta measurement for this front interval.
         z_back_sync = self.pending_back_delta_rate * dt_front
         z_back_sync = wrap_vec_angles(z_back_sync, [3, 4, 5])
 
@@ -826,19 +826,19 @@ class DualOdomDeltaStateNode(object):
             self.last_front_raw_meas = meas
             return
 
-        # 控制输入：变化量的导数（Delta_dot）
+        # Control input: derivative of the change, Delta_dot.
         u_front = delta_to_rate(delta_front, dt_front)
 
-        # 先用控制输入预测局部增量状态
+        # Predict the local delta state with the control input.
         self.x, self.P = self.kf.predict(self.x, self.P, dt_front, u=u_front)
 
-        # 再用 front 的“相对变换 Delta”做观测更新
+        # Update with the front relative transform Delta.
         self.x, self.P = self.kf.update_delta(self.x, self.P, delta_front, self.kf.R_front)
 
-        # 如果有历史 back，则把 back 的 Delta_dot 同步成当前 front interval 的 Delta 再更新一次
+        # If a back sample exists, sync its Delta_dot into this front interval.
         self._maybe_update_with_pending_back(dt_front, meas.timestamp)
 
-        # 把这一小段融合后的 Delta 提交到全局 pose
+        # Commit the fused Delta segment to the global pose.
         self._commit_fused_delta()
 
         self.filter_time = meas.timestamp
@@ -859,7 +859,7 @@ class DualOdomDeltaStateNode(object):
                     if meas.source == "front":
                         self._init_from_front_measurement(meas)
                     else:
-                        # 初始化前到达的 back 仅用于建立 back 历史，不单独启动全局输出
+                        # Back samples before initialization only seed history.
                         self._process_back_measurement(meas)
                     processed += 1
                     continue
@@ -923,7 +923,7 @@ class DualOdomDeltaStateNode(object):
             now_time = rospy.Time.now()
             now_sec = now_time.to_sec()
 
-            # /fused_odom 只预测到现在
+            # /fused_odom predicts only to now.
             if self.publish_predict_to_now and now_sec > self.filter_time + 1e-9:
                 ref_pos, ref_ori, ref_pose_cov, x_ref, P_ref = self._predict_publish_pose_to_now(now_sec)
                 ref_time = now_sec
@@ -941,7 +941,7 @@ class DualOdomDeltaStateNode(object):
                 if abs(current_stamp.to_sec() - self.last_pub_time.to_sec()) < 1e-9:
                     return
 
-            # 当前 odom: 仍然只到 now
+            # Current odom still ends at now.
             msg = Odometry()
             msg.header.stamp = current_stamp
             msg.header.frame_id = self.world_frame
@@ -997,7 +997,7 @@ class DualOdomDeltaStateNode(object):
             )
             self.pub_marker.publish(current_marker)
 
-            # 未来预测：单独发布 future global / future local
+            # Future prediction publishes future global and local outputs separately.
             future_bundle = self._build_future_prediction_bundle(ref_pos, ref_ori, ref_pose_cov, x_ref, P_ref)
             future_dt = future_bundle["dt_future"]
 

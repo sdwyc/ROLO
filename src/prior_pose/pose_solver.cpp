@@ -212,7 +212,7 @@ bool GroundModel::FitLocalSurface(const Eigen::Vector2d& xy, double radius,
         return false;
     }
 
-    // 1. 半径搜索获取邻近点
+    // Picked-neighbor flag
     pcl::PointXYZ center(static_cast<float>(xy.x()), static_cast<float>(xy.y()), 0.0f);
     std::vector<int> indices;
     std::vector<float> dists;
@@ -222,7 +222,7 @@ bool GroundModel::FitLocalSurface(const Eigen::Vector2d& xy, double radius,
         return false;
     }
 
-    // 2. 提取点云数据
+    // Extracted cloud
     std::vector<Eigen::Vector3d> neighbors;
     neighbors.reserve(indices.size());
     for (int idx : indices) {
@@ -232,21 +232,21 @@ bool GroundModel::FitLocalSurface(const Eigen::Vector2d& xy, double radius,
         }
     }
 
-    // 3. 按照z值剔除离群点
+    // Reject outliers by z value
     std::vector<Eigen::Vector3d> inliers;
     RemoveOutliers(neighbors, outlier_threshold, inliers);
     
-    if (inliers.size() < min_points) {
+    if (inliers.size() < static_cast<std::size_t>(min_points)) {
         return false;
     }
 
-    // 4. 拟合平面
+    // Fit local plane
     Eigen::Vector4d plane_coeffs;
     if (!FitPlane(inliers, plane_coeffs)) {
         return false;
     }
 
-    // 5. 计算轮子位置对应的z值
+    // Compute wheel-height z value
     double a = plane_coeffs[0], b = plane_coeffs[1];
     double c = plane_coeffs[2], d = plane_coeffs[3];
     
@@ -299,7 +299,7 @@ void GroundModel::RemoveOutliers(const std::vector<Eigen::Vector3d>& points,
                                 std::vector<Eigen::Vector3d>& inliers) const {
     if (points.empty()) return;
     
-    // 计算z值的均值和标准差
+    // Compute z mean and standard deviation
     double sum_z = 0.0;
     for (const auto& pt : points) {
         sum_z += pt.z();
@@ -312,7 +312,7 @@ void GroundModel::RemoveOutliers(const std::vector<Eigen::Vector3d>& points,
     }
     double std_z = std::sqrt(sum_sq / points.size());
     
-    // 剔除离群点
+    // Remove outliers
     double lower_bound = mean_z - threshold * std_z;
     double upper_bound = mean_z + threshold * std_z;
     
@@ -327,25 +327,25 @@ bool GroundModel::FitPlane(const std::vector<Eigen::Vector3d>& points,
                           Eigen::Vector4d& plane_coeffs) const {
     if (points.size() < 3) return false;
     
-    // 计算质心
+    // Voxel centroid
     Eigen::Vector3d centroid(0, 0, 0);
     for (const auto& pt : points) {
         centroid += pt;
     }
     centroid /= points.size();
     
-    // 构建协方差矩阵
+    // Current pose covariance
     Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
     for (const auto& pt : points) {
         Eigen::Vector3d centered = pt - centroid;
         cov += centered * centered.transpose();
     }
     
-    // 特征值分解
+    // Eigen decomposition
     Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eig(cov);
     Eigen::Vector3d normal = eig.eigenvectors().col(0);
     
-    // 平面方程: n·(p - p0) = 0 => n·p - n·p0 = 0
+    // Plane equation
     double d = -normal.dot(centroid);
     plane_coeffs << normal[0], normal[1], normal[2], d;
     
@@ -375,7 +375,7 @@ bool GroundModel::NearestIndexXY(const Eigen::Vector2d &xy, int *index_out) cons
   return false;
 }
 
-// ... 其余代码保持不变 ...
+// Remaining code unchanged
 PoseSolver::PoseSolver(const VehicleModel &vehicle, const GroundModel &ground,
                        double z_min, double z_max,
                        double roll_abs_max, double pitch_abs_max,
@@ -627,17 +627,17 @@ void PoseSolver::ComputeResidualAndJacobian(double x, double y, double yaw,
   for (size_t i = 0; i < k; ++i) {
     const Eigen::Vector3d p_i_b = vehicle_.base_vertices_b()[i];
     const Eigen::Vector3d pw_w = R * p_i_b + t;
-    // 替换原来的最近点查询
+    // Replace nearest-point lookup
 Eigen::Vector3d p_n;
-double fit_radius = 0.6;  // 拟合半径
-double outlier_threshold = 3; // 3倍标准差
+double fit_radius = 0.6;  // Fit radius
+double outlier_threshold = 3; // Outlier threshold
 int min_points = 15;
 
 if (ground_.FitLocalSurface(Eigen::Vector2d(pw_w.x(), pw_w.y()), 
                            fit_radius, outlier_threshold, min_points, p_n)) {
-    // 使用拟合的曲面点
+    // Surface cloud
 } else {
-    // 回退到原来的最近点方法
+    // Fallback to nearest-point lookup
     p_n = ground_.NearestPointXY(Eigen::Vector2d(pw_w.x(), pw_w.y()));
 }
 

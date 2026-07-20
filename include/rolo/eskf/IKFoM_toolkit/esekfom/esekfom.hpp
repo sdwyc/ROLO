@@ -380,12 +380,12 @@ public:
 			MTK::SO3<scalar_type> res;
 			res.w() = MTK::exp<scalar_type, 3>(res.vec(), seg_S2, scalar_type(1/2));
 			Eigen::Matrix<scalar_type, 2, 3> Nx;
-			Eigen::Matrix<scalar_type, 3, 2> Mx;
+			Eigen::Matrix<scalar_type, 3, 2> Mx = Eigen::Matrix<scalar_type, 3, 2>::Zero();
 			x_.S2_Nx_yy(Nx, idx);
 			x_before.S2_Mx(Mx, vec, idx);
 			F_x1.template block<2, 2>(idx, idx) = Nx * res.toRotationMatrix() * Mx;
 
-			Eigen::Matrix<scalar_type, 3, 3> x_before_hat;
+			Eigen::Matrix<scalar_type, 3, 3> x_before_hat = Eigen::Matrix<scalar_type, 3, 3>::Zero();
 			x_before.S2_hat(x_before_hat, idx);
 			res_temp_S2 = -Nx * res.toRotationMatrix() * x_before_hat*MTK::A_matrix(seg_S2).transpose();
 			
@@ -433,7 +433,6 @@ public:
 			MTK::vect<3, scalar_type> seg_SO3;
 			for (std::vector<std::pair<int, int> >::iterator it = x_.SO3_state.begin(); it != x_.SO3_state.end(); it++) {
 				int idx = (*it).first;
-				int dim = (*it).second;
 				for(int i = 0; i < 3; i++){
 					seg_SO3(i) = dx(idx+i);
 				}
@@ -450,7 +449,6 @@ public:
 			
 			for (std::vector<std::pair<std::pair<int, int>, int> >::iterator it = x_.SEN_state.begin(); it != x_.SEN_state.end(); it++) {
 				int idx = (*it).first.first;
-				int dim = (*it).first.second;
 				int dof = (*it).second;
 				VectorXd seg_sen, jac_sen, sen_p, jac_p;
 				MatrixXd jacr;
@@ -496,13 +494,12 @@ public:
 			MTK::vect<2, scalar_type> seg_S2;
 			for (std::vector<std::pair<int, int> >::iterator it = x_.S2_state.begin(); it != x_.S2_state.end(); it++) {
 				int idx = (*it).first;
-				int dim = (*it).second;
 				for(int i = 0; i < 2; i++){
 					seg_S2(i) = dx(idx + i);
 				}
 				
 				Eigen::Matrix<scalar_type, 2, 3> Nx;
-				Eigen::Matrix<scalar_type, 3, 2> Mx;
+				Eigen::Matrix<scalar_type, 3, 2> Mx = Eigen::Matrix<scalar_type, 3, 2>::Zero();
 				x_.S2_Nx_yy(Nx, idx);
 				x_propagated.S2_Mx(Mx, seg_S2, idx);
 				res_temp_S2 = Nx * Mx; 
@@ -549,7 +546,6 @@ public:
 				L_ = P_;
 				for (std::vector<std::pair<std::pair<int, int>, int> >::iterator it = x_.SEN_state.begin(); it != x_.SEN_state.end(); it++) {
 					int idx = (*it).first.first;
-					int dim = (*it).first.second;
 					int dof = (*it).second;
 					VectorXd seg_sen(dof), sen_p(dof), jac_p;
 					MatrixXd jacr;
@@ -663,7 +659,7 @@ public:
 					}
 			
 					Eigen::Matrix<scalar_type, 2, 3> Nx;
-					Eigen::Matrix<scalar_type, 3, 2> Mx;
+				Eigen::Matrix<scalar_type, 3, 2> Mx = Eigen::Matrix<scalar_type, 3, 2>::Zero();
 					x_.S2_Nx_yy(Nx, idx);
 					x_propagated.S2_Mx(Mx, seg_S2, idx);
 					res_temp_S2 = Nx * Mx; 
@@ -808,7 +804,7 @@ public:
 				}
 				
 				Eigen::Matrix<scalar_type, 2, 3> Nx;
-				Eigen::Matrix<scalar_type, 3, 2> Mx;
+				Eigen::Matrix<scalar_type, 3, 2> Mx = Eigen::Matrix<scalar_type, 3, 2>::Zero();
 				x_.S2_Nx_yy(Nx, idx);
 				x_propagated.S2_Mx(Mx, seg_S2, idx);
 				res_temp_S2 = Nx * Mx; 
@@ -968,7 +964,7 @@ public:
 					}
 			
 					Eigen::Matrix<scalar_type, 2, 3> Nx;
-					Eigen::Matrix<scalar_type, 3, 2> Mx;
+				Eigen::Matrix<scalar_type, 3, 2> Mx = Eigen::Matrix<scalar_type, 3, 2>::Zero();
 					x_.S2_Nx_yy(Nx, idx);
 					x_propagated.S2_Mx(Mx, seg_S2, idx);
 					res_temp_S2 = Nx * Mx; 
@@ -1106,7 +1102,7 @@ public:
 				}
 
 				Eigen::Matrix<scalar_type, 2, 3> Nx;
-				Eigen::Matrix<scalar_type, 3, 2> Mx;
+				Eigen::Matrix<scalar_type, 3, 2> Mx = Eigen::Matrix<scalar_type, 3, 2>::Zero();
 				x_.S2_Nx_yy(Nx, idx);
 				x_propagated.S2_Mx(Mx, seg_S2, idx);
 				res_temp_S2 = Nx * Mx; 
@@ -1263,7 +1259,7 @@ public:
 					}
 			
 					Eigen::Matrix<scalar_type, 2, 3> Nx;
-					Eigen::Matrix<scalar_type, 3, 2> Mx;
+				Eigen::Matrix<scalar_type, 3, 2> Mx = Eigen::Matrix<scalar_type, 3, 2>::Zero();
 					x_.S2_Nx_yy(Nx, idx);
 					x_propagated.S2_Mx(Mx, seg_S2, idx);
 					res_temp_S2 = Nx * Mx; 
@@ -1405,7 +1401,7 @@ public:
 				}
 
 				Eigen::Matrix<scalar_type, 2, 3> Nx;
-				Eigen::Matrix<scalar_type, 3, 2> Mx;
+				Eigen::Matrix<scalar_type, 3, 2> Mx = Eigen::Matrix<scalar_type, 3, 2>::Zero();
 				x_.S2_Nx_yy(Nx, idx);
 				x_propagated.S2_Mx(Mx, seg_S2, idx);
 				res_temp_S2 = Nx * Mx; 
@@ -1563,7 +1559,7 @@ public:
 					}
 			
 					Eigen::Matrix<scalar_type, 2, 3> Nx;
-					Eigen::Matrix<scalar_type, 3, 2> Mx;
+				Eigen::Matrix<scalar_type, 3, 2> Mx = Eigen::Matrix<scalar_type, 3, 2>::Zero();
 					x_.S2_Nx_yy(Nx, idx);
 					x_propagated.S2_Mx(Mx, seg_S2, idx);
 					res_temp_S2 = Nx * Mx; 
@@ -1704,7 +1700,7 @@ public:
 				}
 
 				Eigen::Matrix<scalar_type, 2, 3> Nx;
-				Eigen::Matrix<scalar_type, 3, 2> Mx;
+				Eigen::Matrix<scalar_type, 3, 2> Mx = Eigen::Matrix<scalar_type, 3, 2>::Zero();
 				x_.S2_Nx_yy(Nx, idx);
 				x_propagated.S2_Mx(Mx, seg_S2, idx);
 				res_temp_S2 = Nx * Mx; 
@@ -1863,7 +1859,7 @@ public:
 					}
 			
 					Eigen::Matrix<scalar_type, 2, 3> Nx;
-					Eigen::Matrix<scalar_type, 3, 2> Mx;
+				Eigen::Matrix<scalar_type, 3, 2> Mx = Eigen::Matrix<scalar_type, 3, 2>::Zero();
 					x_.S2_Nx_yy(Nx, idx);
 					x_propagated.S2_Mx(Mx, seg_S2, idx);
 					res_temp_S2 = Nx * Mx; 
@@ -2008,7 +2004,7 @@ public:
 				}
 
 				Eigen::Matrix<scalar_type, 2, 3> Nx;
-				Eigen::Matrix<scalar_type, 3, 2> Mx;
+				Eigen::Matrix<scalar_type, 3, 2> Mx = Eigen::Matrix<scalar_type, 3, 2>::Zero();
 				x_.S2_Nx_yy(Nx, idx);
 				x_propagated.S2_Mx(Mx, seg_S2, idx);
 				res_temp_S2 = Nx * Mx; 
@@ -2168,7 +2164,7 @@ public:
 					}
 			
 					Eigen::Matrix<scalar_type, 2, 3> Nx;
-					Eigen::Matrix<scalar_type, 3, 2> Mx;
+				Eigen::Matrix<scalar_type, 3, 2> Mx = Eigen::Matrix<scalar_type, 3, 2>::Zero();
 					x_.S2_Nx_yy(Nx, idx);
 					x_propagated.S2_Mx(Mx, seg_S2, idx);
 					res_temp_S2 = Nx * Mx; 

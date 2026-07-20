@@ -43,55 +43,6 @@ if (OPENMP_FOUND)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
-set(SMALL_GICP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/include/small_gicp")
-set(SMALL_GICP_INCLUDE_DIR "${SMALL_GICP_ROOT}/include")
-set(SMALL_GICP_PCL_HEADER "${SMALL_GICP_INCLUDE_DIR}/small_gicp/pcl/pcl_registration.hpp")
-
-if(EXISTS "${SMALL_GICP_PCL_HEADER}")
-  # if(DEFINED PCL_VERSION AND PCL_VERSION VERSION_LESS "1.11.0")
-  #   message(FATAL_ERROR
-  #     "small_gicp PCL interface requires PCL >= 1.11, but found ${PCL_VERSION}. "
-  #   )
-  # endif()
-
-  add_library(small_gicp_vendor INTERFACE)
-  target_include_directories(small_gicp_vendor INTERFACE
-    ${SMALL_GICP_INCLUDE_DIR}
-    ${PCL_INCLUDE_DIRS}
-  )
-  target_compile_definitions(small_gicp_vendor INTERFACE BUILD_WITH_PCL)
-  target_link_libraries(small_gicp_vendor INTERFACE
-    Eigen3::Eigen
-    ${PCL_LIBRARIES}
-  )
-  if(OPENMP_FOUND AND TARGET OpenMP::OpenMP_CXX)
-    target_link_libraries(small_gicp_vendor INTERFACE OpenMP::OpenMP_CXX)
-  endif()
-# else()
-#   message(WARNING
-#     "small_gicp vendored repo was not found at ${SMALL_GICP_ROOT}. "
-#     "Clone https://github.com/koide3/small_gicp into src/ROLO/include before using the small_gicp PCL interface."
-#   )
-endif()
-
-# pmc (Parallel Maximum Clique)
-
-unset(PMC CACHE)
-find_library(PMC pmc)
-if(${PMC} STREQUAL "PMC-NOTFOUND")
-    message(WARNING "PMC library was not found, Git Now")
-    execute_process(COMMAND mkdir ${CMAKE_BINARY_DIR}/pmc-src)
-    execute_process(COMMAND mkdir ${CMAKE_BINARY_DIR}/pmc-build)
-    
-    configure_file(cmake/pmc.CMakeLists.txt ${CMAKE_BINARY_DIR}/pmc-download/CMakeLists.txt)
-    execute_process(COMMAND "${CMAKE_COMMAND}" -G "${CMAKE_GENERATOR}" .
-            WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/pmc-download")
-    execute_process(COMMAND "${CMAKE_COMMAND}" --build .
-            WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/pmc-download")
-    add_subdirectory("${CMAKE_BINARY_DIR}/pmc-src"
-            "${CMAKE_BINARY_DIR}/pmc-build")
-endif()
-
 add_message_files(
   # DIRECTORY msg
   FILES
@@ -120,7 +71,7 @@ generate_messages(
 
 catkin_package(
   INCLUDE_DIRS include
-  DEPENDS PCL GTSAM
+  DEPENDS PCL
 
   CATKIN_DEPENDS
   autoware_rviz_msgs
@@ -196,9 +147,6 @@ add_executable(${PROJECT_NAME}_backMapping
 add_dependencies(${PROJECT_NAME}_backMapping ${PROJECT_NAME}_generate_messages_cpp)
 target_compile_options(${PROJECT_NAME}_backMapping PRIVATE ${OpenMP_CXX_FLAGS})
 target_link_libraries(${PROJECT_NAME}_backMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam)
-if(TARGET small_gicp_vendor)
-  target_link_libraries(${PROJECT_NAME}_backMapping small_gicp_vendor)
-endif()
 
 add_executable(prior_pose_node
   src/prior_pose/pose_solver.cpp
@@ -213,9 +161,9 @@ target_link_libraries(prior_pose_node
 )
 
 ## Test executable
-add_executable(rotation_test test/rotation_test.cpp)
-target_link_libraries(rotation_test ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
+# add_executable(rotation_test test/rotation_test.cpp)
+# target_link_libraries(rotation_test ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
 
-add_executable(eskf_odom_test test/eskf_odom_test.cpp)
-add_dependencies(eskf_odom_test ${PROJECT_NAME}_generate_messages_cpp)
-target_link_libraries(eskf_odom_test ${catkin_LIBRARIES})
+# add_executable(eskf_odom_test test/eskf_odom_test.cpp)
+# add_dependencies(eskf_odom_test ${PROJECT_NAME}_generate_messages_cpp)
+# target_link_libraries(eskf_odom_test ${catkin_LIBRARIES})

@@ -31,14 +31,14 @@ typedef pcl::PointCloud<pcl::FPFHSignature33> fpfhFeature;
 string src_path;
 string dst_path;
 
-const int systemDelay = 0; // 系统延时开启时间
+const int systemDelay = 0; // Time update
 int systemInitCount = 0;
 bool systemInited = false;
-int N_SCANS = 16;    // 激光雷达线数
-float cloudCurvature[400000];   // 存储每个点的平滑度
-int cloudSortInd[400000];       // 存储点的索引，根据平滑度由小到大排序
-int cloudNeighborPicked[400000]; // 如果点周围没有选为角点或平面点，则为0；反之为1
-int cloudLabel[400000];         // 标记点的状态，2：角点，1：轻微角点，0：普通，-1，平面点
+int N_SCANS = 16;    // LiDAR scan count
+float cloudCurvature[400000];   // Point smoothness
+int cloudSortInd[400000];       // Point index
+int cloudNeighborPicked[400000]; // Surface cloud
+int cloudLabel[400000];         // Surface cloud
 
 bool comp (int i,int j) { return (cloudCurvature[i]<cloudCurvature[j]); }
 
@@ -46,7 +46,7 @@ template <typename PointT>
 void removeClosedPointCloud(const pcl::PointCloud<PointT> &cloud_in,
                               pcl::PointCloud<PointT> &cloud_out, float thres)
 {
-    if (&cloud_in != &cloud_out) // 初始化点云header
+    if (&cloud_in != &cloud_out) // Initialize cloud header
     {
         cloud_out.header = cloud_in.header;
         cloud_out.points.resize(cloud_in.points.size());
@@ -54,7 +54,7 @@ void removeClosedPointCloud(const pcl::PointCloud<PointT> &cloud_in,
 
     size_t j = 0;
 
-    for (size_t i = 0; i < cloud_in.points.size(); ++i) // 遍历所有输入的点云
+    for (size_t i = 0; i < cloud_in.points.size(); ++i) // Traverse all input points
     {
         if (cloud_in.points[i].x * cloud_in.points[i].x + cloud_in.points[i].y * cloud_in.points[i].y + cloud_in.points[i].z * cloud_in.points[i].z < thres * thres)
             continue;
@@ -66,25 +66,25 @@ void removeClosedPointCloud(const pcl::PointCloud<PointT> &cloud_in,
         cloud_out.points.resize(j);
     }
 
-    cloud_out.height = 1; // 对于无组织点云数据集，高度设置为1；对于一个有组织的点云数据集，高度等于行数。
-    cloud_out.width = static_cast<uint32_t>(j);// 对于无组织点云数据集，宽度特指该点云所有点的个数；对于有组织的点云数据集，宽度是指一行有多少个点。
-    cloud_out.is_dense = true; // 指定点云中的所有数据是有效的则为true，否则为false (e.g., have NaN or Inf values).）
+    cloud_out.height = 1; // Unorganized cloud height
+    cloud_out.width = static_cast<uint32_t>(j);// Unorganized cloud width
+    cloud_out.is_dense = true; // Cloud contains valid points
 }
 
 void featureExtraction(const pcl::PointCloud<PointType> &inputCloud, pcl::PointCloud<PointType> &featureCloud){
-    //创建一个vector，包含16个值为0的元素
-    std::vector<int> scanStartInd(N_SCANS, 0); // 记录了每一线中开始迭代计算某点平滑度的起始索引
-    std::vector<int> scanEndInd(N_SCANS, 0);   // 记录了每一线中开始迭代计算某点平滑度的结束索引
+    // Create zero-filled scan index vectors
+    std::vector<int> scanStartInd(N_SCANS, 0); // Point index
+    std::vector<int> scanEndInd(N_SCANS, 0);   // Point index
 
-    pcl::PointCloud<PointType> laserCloudIn; // 输入cloud
+    pcl::PointCloud<PointType> laserCloudIn; // LiDAR cloud in
     laserCloudIn = inputCloud;
     
     std::vector<int> indices;
 
-    pcl::removeNaNFromPointCloud(laserCloudIn, laserCloudIn, indices); // indices为对应保留的点索引
-    removeClosedPointCloud(laserCloudIn, laserCloudIn, 0.5); // 滤除距离机器人过近的点云
+    pcl::removeNaNFromPointCloud(laserCloudIn, laserCloudIn, indices); // Point index
+    removeClosedPointCloud(laserCloudIn, laserCloudIn, 0.5); // Filter points too close to robot
 
-    int cloudSize = laserCloudIn.points.size(); // 点云规模
+    int cloudSize = laserCloudIn.points.size(); // Cloud size
     float startOri = -atan2(laserCloudIn.points[0].y, laserCloudIn.points[0].x);
     float endOri = -atan2(laserCloudIn.points[cloudSize - 1].y,
                           laserCloudIn.points[cloudSize - 1].x) +
@@ -98,22 +98,22 @@ void featureExtraction(const pcl::PointCloud<PointType> &inputCloud, pcl::PointC
     {
         endOri += 2 * M_PI;
     }
-    // 限制endOri与startOri的角度在0～360度以内
+    // Keep orientation span within 360 degrees
     //printf("end Ori %f\n", endOri);
 
-    bool halfPassed = false; // 用于判断是否超过startOri 180度
+    bool halfPassed = false; // Half passed
     int count = cloudSize;
     PointType point;
-    std::vector<pcl::PointCloud<PointType>> laserCloudScans(N_SCANS); //vector包含了每一线的点云
+    std::vector<pcl::PointCloud<PointType>> laserCloudScans(N_SCANS); // Per-ring cloud buffers
     for (int i = 0; i < cloudSize; i++)
     {
         point.x = laserCloudIn.points[i].x;
         point.y = laserCloudIn.points[i].y;
         point.z = laserCloudIn.points[i].z;
 
-        float angle = atan(point.z / sqrt(point.x * point.x + point.y * point.y)) * 180 / M_PI; // 点到基座的俯仰角，单位：degree
+        float angle = atan(point.z / sqrt(point.x * point.x + point.y * point.y)) * 180 / M_PI; // Y
         int scanID = 0;
-        // 判断一个点属于哪个线上的点，scanID为线数的序列号
+        // Assign point to scan ring
         if (N_SCANS == 16)
         {
             scanID = int((angle + 15) / 2 + 0.5);
@@ -183,8 +183,8 @@ void featureExtraction(const pcl::PointCloud<PointType> &inputCloud, pcl::PointC
             }
         }
 
-        float relTime = (ori - startOri) / (endOri - startOri); // 偏航角的角度占比，与intensity有关
-        point.intensity = scanID + 0.1 * relTime;    // intensity包含了扫瞄线数和朝向角信息
+        float relTime = (ori - startOri) / (endOri - startOri); // Intensity field
+        point.intensity = scanID + 0.1 * relTime;    // Intensity field
         laserCloudScans[scanID].push_back(point); 
     }
     
@@ -198,10 +198,10 @@ void featureExtraction(const pcl::PointCloud<PointType> &inputCloud, pcl::PointC
         scanEndInd[i] = laserCloud->size() - 6;
     }
 
-    // 计算所有点的平滑度（前后5个为一组，一组共11个）
+    // Point smoothness
     for (int i = 5; i < cloudSize - 5; i++)
     {
-        // 计算第i个点的前后5X5区域的平滑度（曲率，cloudCurvature）, 数越大代表越尖，数越小代表平坦
+        // Point smoothness
         float diffX = laserCloud->points[i - 5].x + laserCloud->points[i - 4].x + laserCloud->points[i - 3].x + laserCloud->points[i - 2].x + laserCloud->points[i - 1].x - 10 * laserCloud->points[i].x + laserCloud->points[i + 1].x + laserCloud->points[i + 2].x + laserCloud->points[i + 3].x + laserCloud->points[i + 4].x + laserCloud->points[i + 5].x;
         float diffY = laserCloud->points[i - 5].y + laserCloud->points[i - 4].y + laserCloud->points[i - 3].y + laserCloud->points[i - 2].y + laserCloud->points[i - 1].y - 10 * laserCloud->points[i].y + laserCloud->points[i + 1].y + laserCloud->points[i + 2].y + laserCloud->points[i + 3].y + laserCloud->points[i + 4].y + laserCloud->points[i + 5].y;
         float diffZ = laserCloud->points[i - 5].z + laserCloud->points[i - 4].z + laserCloud->points[i - 3].z + laserCloud->points[i - 2].z + laserCloud->points[i - 1].z - 10 * laserCloud->points[i].z + laserCloud->points[i + 1].z + laserCloud->points[i + 2].z + laserCloud->points[i + 3].z + laserCloud->points[i + 4].z + laserCloud->points[i + 5].z;
@@ -224,21 +224,21 @@ void featureExtraction(const pcl::PointCloud<PointType> &inputCloud, pcl::PointC
         if( scanEndInd[i] - scanStartInd[i] < 6)
             continue;
         pcl::PointCloud<PointType>::Ptr surfPointsLessFlatScan(new pcl::PointCloud<PointType>);
-        // 在横向上将每一线都分成六个扇区
+        // Split scan into sectors
         for (int j = 0; j < 6; j++)
         {
-            // 求每个扇区的起始索引和结束索引
+            // Split scan into sectors
             int sp = scanStartInd[i] + (scanEndInd[i] - scanStartInd[i]) * j / 6; 
             int ep = scanStartInd[i] + (scanEndInd[i] - scanStartInd[i]) * (j + 1) / 6 - 1;
 
-            // 第i个扇区的索引按照平滑度由小到大排序
+            // Point smoothness
             std::sort (cloudSortInd + sp, cloudSortInd + ep + 1, comp);
-            // 开始筛选角点
+            // Picked-neighbor flag
             int largestPickedNum = 0;
             for (int k = ep; k >= sp; k--)
             {
                 int ind = cloudSortInd[k]; 
-                // 当平滑度>0.1，且邻居没有选择，则选为角点，每个扇区数量最大为20
+                // Point smoothness
                 if (cloudNeighborPicked[ind] == 0 &&
                     cloudCurvature[ind] > 0.1)
                 {
@@ -290,9 +290,9 @@ void featureExtraction(const pcl::PointCloud<PointType> &inputCloud, pcl::PointC
                     }
                 }
             }
-            // 开始筛选平面点
+            // Surface cloud
             int smallestPickedNum = 0;
-            // 当点的邻居没有被选择，且平滑度<0.1时，每个扇区最大数量为4个，被选为平面点
+            // Surface cloud
             for (int k = sp; k <= ep; k++)
             {
                 int ind = cloudSortInd[k];
@@ -347,7 +347,7 @@ void featureExtraction(const pcl::PointCloud<PointType> &inputCloud, pcl::PointC
                 }
             }
         }
-        // 对轻微平面点进行体素滤波
+        // Surface cloud
         pcl::PointCloud<PointType> surfPointsLessFlatScanDS;
         pcl::VoxelGrid<PointType> downSizeFilter;
         downSizeFilter.setInputCloud(surfPointsLessFlatScan);
@@ -360,9 +360,9 @@ void featureExtraction(const pcl::PointCloud<PointType> &inputCloud, pcl::PointC
 }
 
 /**
- * @brief: 绕 axis 轴旋转 theta 度
- * @param {float} theta 单位为度
- * @param {string} axis 可选 x, y, z
+ *  Rotate theta degrees around axis
+ *  Theta is in degrees
+ *  Laser ring id
  * @param {Ptr} &source
  * @param {Ptr} &target
  * @return {*}
@@ -392,7 +392,7 @@ void euclidean_rotate(float theta, std::string axis, pcl::PointCloud<PointType>:
 }
 
 /**
- * @brief: 平移变换
+ *  Translation update
  * @param {float} x
  * @param {float} y
  * @param {float} z
@@ -462,40 +462,40 @@ void teaser_to_correspondence(std::vector<std::pair<int, int>> &input,
 }
 
 /**
- * @brief: 计算法向量
+ *  Normal cloud
  * @param {Ptr} &cloud
- * @param {Ptr} &normals 返回法向坐标和表面曲率估计的点结构
+ *  Normal cloud
  * @return {*}
  * @note:
  * @warning:
  */
 void compute_normal(pcl::PointCloud<PointType>::Ptr &cloud, pcl::PointCloud<pcl::Normal>::Ptr &normals) {
     pcl::search::KdTree<PointType>::Ptr tree(new pcl::search::KdTree<PointType>());
-    //-------------------------法向量估计-----------------------
+    // Normal cloud
     pcl::NormalEstimationOMP<PointType, pcl::Normal> n;
     n.setInputCloud(cloud);
-    n.setNumberOfThreads(8); //设置openMP的线程数
-    // n.setViewPoint(0,0,0);//设置视点，默认为（0，0，0）
+    n.setNumberOfThreads(8); // Thread count
+    // n.setViewPoint(0,0,0);// Set view point
     n.setSearchMethod(tree);
     n.setKSearch(10);
-    // n.setRadiusSearch(0.03);//半径搜素
+    // n.setRadiusSearch(0.03);// Fit radius
     n.compute(*normals);
 }
 
 /**
- * @brief: 计算 FPFH 特征描述子
- * @param {Ptr} input_cloud 输入点云
- * @param {Ptr} normals 输入点云的法向量
+ *  Compute FPFH descriptor
+ *  Input cloud
+ *  Normal cloud
  * @return {*}
  * @note:
  * @warning:
  */
 fpfhFeature::Ptr compute_fpfh_feature(pcl::PointCloud<PointType>::Ptr input_cloud, pcl::PointCloud<pcl::Normal>::Ptr normals) {
     pcl::search::KdTree<PointType>::Ptr tree(new pcl::search::KdTree<PointType>());
-    //------------------FPFH估计-------------------------------
+    // FPFH estimation
     fpfhFeature::Ptr fpfh(new fpfhFeature);
     pcl::FPFHEstimationOMP<PointType, pcl::Normal, pcl::FPFHSignature33> f;
-    f.setNumberOfThreads(8); // 指定8核计算
+    f.setNumberOfThreads(8); // Set number of threads
     f.setInputCloud(input_cloud);
     f.setInputNormals(normals);
     f.setSearchMethod(tree);
@@ -593,10 +593,10 @@ int main(int argc, char** argv)
         return 0;
     }
     // Load the .pcd file
-    pcl::PointCloud<PointType>::Ptr SourceCloud(new pcl::PointCloud<PointType>); // 源点云
-    pcl::PointCloud<PointType>::Ptr TargetCloud(new pcl::PointCloud<PointType>); // 目标点云   
-    pcl::PointCloud<PointType>::Ptr SCloud(new pcl::PointCloud<PointType>); // 源点云
-    pcl::PointCloud<PointType>::Ptr TCloud(new pcl::PointCloud<PointType>); // 目标点云
+    pcl::PointCloud<PointType>::Ptr SourceCloud(new pcl::PointCloud<PointType>); // Source cloud
+    pcl::PointCloud<PointType>::Ptr TargetCloud(new pcl::PointCloud<PointType>); // Target cloud
+    pcl::PointCloud<PointType>::Ptr SCloud(new pcl::PointCloud<PointType>); // Source cloud
+    pcl::PointCloud<PointType>::Ptr TCloud(new pcl::PointCloud<PointType>); // Target cloud
     pcl::PointCloud<PointType>::Ptr TransformCloud(new pcl::PointCloud<PointType>);
     pcl::io::loadPCDFile(src_path, *SourceCloud);
     pcl::io::loadPCDFile(dst_path, *TargetCloud);
@@ -604,14 +604,14 @@ int main(int argc, char** argv)
     featureExtraction(*TargetCloud, *TCloud);
 
     if(use_priored_transformed){
-        // 旋转平移
+        // Apply rotation and translation
         // TCloud->clear();
         euclidean_rotate(r_r, "x", TCloud, TCloud);
         euclidean_rotate(r_p, "y", TCloud, TCloud);
         euclidean_rotate(r_y, "z", TCloud, TCloud);
         euclidean_translate(t_x, t_y, t_z, TCloud, TCloud);
     }
-    // 降采样
+    // Downsample clouds
     voxel_filter(SCloud, SCloud, 0.5);
     voxel_filter(TCloud, TCloud, 0.5);
     printf("source cloud size: \nraw(%d), raw_feature(%d)\ntarget(%d), tar_feature(%d)\n"
@@ -619,7 +619,7 @@ int main(int argc, char** argv)
                                           , TargetCloud->size(), TCloud->size());
 
     ROS_INFO("\033[1;32m----> Starting Matching.\033[0m");
-    // Teaser++ 配准
+    // Teaser++ registration
     auto start = std::chrono::system_clock::now();
     pcl::Correspondences cru_correspondences;
     teaser::RegistrationSolution solution =
@@ -639,12 +639,12 @@ int main(int argc, char** argv)
             R_E(0),R_E(1),R_E(2));    
     printf("Translation Mat: [%f\t%f\t%f]\n", 
             T(0),T(1),T(2));
-    // 执行变换
+    // Apply transform
     Eigen::Matrix4d transformation = Eigen::Matrix4d::Identity();
     transformation.block<3, 3>(0, 0) = solution.rotation;
     transformation.block<3, 1>(0, 3) = solution.translation;
     pcl::transformPointCloud(*SCloud, *TransformCloud, transformation);
-    // 可视化
+    // Visualization
     // pcl::visualization::PCLVisualizer viewer("Alignment - Teaser");
     // pcl::visualization::PointCloudColorHandlerCustom<PointType> source_color(SCloud, 0, 255, 255);
     // viewer.addPointCloud(SCloud, source_color, "SCloud");
@@ -652,8 +652,8 @@ int main(int argc, char** argv)
     // viewer.addPointCloud(TCloud, target_color, "TCloud");
     // pcl::visualization::PointCloudColorHandlerCustom<PointType> reg_color(SCloud, 0, 255, 0);
     // viewer.addPointCloud(TransformCloud, reg_color, "RegCloud");
-    // 对应关系可视化
-    // viewer.setWindowName("基于特征描述子的对应");
+    // Correspondence visualization
+    // viewer.setWindowName("descriptor-based correspondence")
     // viewer.addCorrespondences<PointType>(TransformCloud, TCloud, cru_correspondences,
     //                                          "correspondence");
     // viewer.setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 2,

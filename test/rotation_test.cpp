@@ -25,8 +25,8 @@ ros::Publisher *point_pub_;
 
 bool src_handler(std_srvs::Empty::Request & req,
                     std_srvs::Empty::Response &res){
-    pcl::PointCloud<PointType>::Ptr SourceCloud(new pcl::PointCloud<PointType>); // 源点云
-    pcl::PointCloud<PointType>::Ptr SCloud(new pcl::PointCloud<PointType>); // 源点云
+    pcl::PointCloud<PointType>::Ptr SourceCloud(new pcl::PointCloud<PointType>); // Source cloud
+    pcl::PointCloud<PointType>::Ptr SCloud(new pcl::PointCloud<PointType>); // Source cloud
     pcl::io::loadPCDFile(src_path, *SourceCloud);
     sensor_msgs::PointCloud2 pt_cloud;
     pcl::toROSMsg(*SourceCloud, pt_cloud);
@@ -35,12 +35,13 @@ bool src_handler(std_srvs::Empty::Request & req,
     pt_cloud.header.stamp = ros::Time::now();
     pt_cloud.header.frame_id = "velodyne";
     point_pub_->publish(pt_cloud);
+    return true;
 }
 
 bool dst_handler(std_srvs::Empty::Request & req,
                     std_srvs::Empty::Response &res){
-    pcl::PointCloud<PointType>::Ptr TargetCloud(new pcl::PointCloud<PointType>); // 目标点云   
-    pcl::PointCloud<PointType>::Ptr TCloud(new pcl::PointCloud<PointType>); // 目标点云
+    pcl::PointCloud<PointType>::Ptr TargetCloud(new pcl::PointCloud<PointType>); // Target cloud
+    pcl::PointCloud<PointType>::Ptr TCloud(new pcl::PointCloud<PointType>); // Target cloud
     pcl::io::loadPCDFile(dst_path, *TargetCloud);
     sensor_msgs::PointCloud2 pt_cloud;
     pcl::toROSMsg(*TargetCloud, pt_cloud);
@@ -49,6 +50,7 @@ bool dst_handler(std_srvs::Empty::Request & req,
     pt_cloud.header.stamp = ros::Time::now();
     pt_cloud.header.frame_id = "velodyne";
     point_pub_->publish(pt_cloud);
+    return true;
 }
 
 int main(int argc, char** argv)

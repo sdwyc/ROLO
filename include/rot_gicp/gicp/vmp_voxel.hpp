@@ -10,7 +10,7 @@
 
 namespace fast_gicp {
 
-static std::vector<Eigen::Vector3i, Eigen::aligned_allocator<Eigen::Vector3i>> neighbor_offsets(NeighborSearchMethod search_method) {
+inline std::vector<Eigen::Vector3i, Eigen::aligned_allocator<Eigen::Vector3i>> neighbor_offsets(NeighborSearchMethod search_method) {
   switch(search_method) {
       // clang-format off
     default:
@@ -70,14 +70,14 @@ public:
     cov.setZero();
   }
   virtual ~VmfVoxel() {}
-  // 虚函数后面“=0”，代表此函数一个纯虚函数，在子类中必须重写
+  // Pure virtual interface
   virtual void append(const Eigen::Vector4d& dir_, const Eigen::Matrix4d& conv_) = 0;
 
   virtual void finalize() = 0;
 
 public:
   int num_points;
-  Eigen::Vector4d mean_dir; // 栅格内点云的质心
+  Eigen::Vector4d mean_dir; // Voxel centroid
   Eigen::Vector4d dir_reg; // normalization
   double r_bar;
   double kappa;
@@ -92,7 +92,7 @@ public:
   virtual ~AdditiveVmfVoxel() {}
   virtual void append(const Eigen::Vector4d& dir_, const Eigen::Matrix4d& conv_) override {
     num_points++;
-    // dir_是点的坐标,先转为单位向量
+    // Normalize the point direction
     mean_dir += dir_;
     r_bar = mean_dir.norm() / num_points;
     cov += conv_;
@@ -120,7 +120,7 @@ public:
 //     num_points++;
 //     Eigen::Matrix4d cov_inv = cov_;
 //     cov_inv(3, 3) = 1;
-//     cov_inv = cov_inv.inverse().eval(); // eval函数代表是先申请新的内存空间，然后在赋值，避免出现重叠问题
+//     cov_inv = cov_inv.inverse().eval(); // Avoid expression aliasing
 
 //     cov += cov_inv;
 //     mean += cov_inv * mean_;
@@ -163,15 +163,15 @@ public:
   VmfVoxelMap(double resolution, Eigen::Vector3d polar_resolution, VoxelAccumulationMode mode, VoxelType type = VoxelType::POLAR)
   : voxel_resolution_(resolution), polar_resolution_(polar_resolution), voxel_mode_(mode), voxel_type_(type) {}
 
-  //! 为点云创建一个新的体素地图
+  //! Build a voxel map
   void create_voxelmap(const pcl::PointCloud<PointT>& cloud, const std::vector<Eigen::Matrix4d, Eigen::aligned_allocator<Eigen::Matrix4d>>& covs) {
     voxels_.clear();
-    for(int i = 0; i < cloud.size(); i++) {
+    for (std::size_t i = 0; i < cloud.size(); ++i) {
       Eigen::Vector4d point = cloud.at(i).getVector4fMap().template cast<double>();
       Eigen::Vector3i coord = voxel_type_ == VoxelType::POLAR ? polar_coord(point) : voxel_coord(point);
 
       auto found = voxels_.find(coord);
-      // 未分配体素，则为其新分配一个体素
+      // Allocate a missing voxel
       if(found == voxels_.end()) {
         VmfVoxel::Ptr voxel;
         switch(voxel_mode_) {
@@ -183,16 +183,16 @@ public:
             voxel = std::shared_ptr<AdditiveVmfVoxel>(new AdditiveVmfVoxel);
             break;
         }
-        // found是一个迭代器指针
+        // Map iterator
         found = voxels_.insert(found, std::make_pair(coord, voxel));
       }
 
-      auto& voxel = found->second; // 找到对应体素
-      voxel->append(point, covs[i]); // 存储的值进行更新
+      auto& voxel = found->second; // Matched voxel
+      voxel->append(point, covs[i]); // Update voxel statistics
     }
 
     for(auto& voxel : voxels_) {
-      voxel.second->finalize(); // 归一化
+      voxel.second->finalize(); // Normalize point direction
     }
   }
 

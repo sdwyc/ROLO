@@ -106,7 +106,7 @@ struct EIGEN_ALIGN16 GroundPatchType
     PCL_ADD_POINT4D;
     float intensity;
     float timestamp;
-    uint8_t label;
+    std::uint8_t label;
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     inline GroundPatchType()
@@ -123,7 +123,7 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(GroundPatchType,
 	(float,z,z)
 	(float,intensity,intensity)
 	(float,timestamp,timestamp)
-	(uint8_t,label,label)
+	(std::uint8_t,label,label)
 )
 
 inline Eigen::Vector3d LoadVector3Param(ros::NodeHandle &nh, const std::string &name,
@@ -183,7 +183,7 @@ public:
     std::string robot_id;
 
     //Topics
-    string pointCloudTopic; // 输入的激光
+    string pointCloudTopic; // Input point cloud topic
     string odomTopic;
 
     //Frames
@@ -235,10 +235,10 @@ public:
     float surroundingKeyframeSearchRadius;
     
     // Loop closure
-    bool  loopClosureEnableFlag; // 回环检测使能位
+    bool  loopClosureEnableFlag; // Enable loop closure
     std::string loopCloseType;
     std::string scInputType;
-    float loopClosureFrequency; // 回环检测频率
+    float loopClosureFrequency; // Loop closure rate
     int   surroundingKeyframeSize;
     float historyKeyframeSearchRadius;
     float historyKeyframeSearchTimeDiff;
@@ -296,7 +296,7 @@ public:
     float globalMapVisualizationSearchRadius;
     float globalMapVisualizationPoseDensity;
     float globalMapVisualizationLeafSize;
-    // 载入param参数
+    // Load parameters
     ParamLoader(bool requireSensorConfig = true)
     {
         nh.param<std::string>("/robot_id", robot_id, "roboat");
@@ -309,7 +309,7 @@ public:
         nh.param<std::string>("rolo/odometryFrame", odometryFrame, "odom");
         nh.param<std::string>("rolo/mapFrame", mapFrame, "map");
         nh.param<vector<double>>("rolo/initPose", initPose, vector<double>());
-        for(int i=3; i<initPose.size(); i++){
+        for(std::size_t i = 3; i < initPose.size(); ++i){
           initPose[i] = initPose[i] * (M_PI/180.0);
         }
 

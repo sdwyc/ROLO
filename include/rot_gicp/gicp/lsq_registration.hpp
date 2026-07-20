@@ -84,10 +84,10 @@ protected:
 
   bool is_rot_converged(const Eigen::Isometry3d& delta) const;
   bool rot_step_lm(Eigen::Isometry3d& x0, Eigen::Isometry3d& delta);
-  virtual double so3_linearize(const Eigen::Isometry3d& trans, Eigen::Matrix<double, 3, 3>* H = nullptr, Eigen::Matrix<double, 3, 1>* b = nullptr) {};
+  virtual double so3_linearize(const Eigen::Isometry3d& trans, Eigen::Matrix<double, 3, 3>* H = nullptr, Eigen::Matrix<double, 3, 1>* b = nullptr) = 0;
   virtual double t3_linearize(const Eigen::Vector3d& trans, const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
                               const double interval_tn, const double interval_tn_1,
-                              Eigen::Matrix<double, 6, 6>* H, Eigen::Matrix<double, 6, 1>* b) {};
+                              Eigen::Matrix<double, 6, 6>* H, Eigen::Matrix<double, 6, 1>* b) = 0;
   bool step_t_optimize(Eigen::Vector3d& x0, Eigen::Vector3d& delta,
                        const Eigen::Vector3d& init_guess, const Eigen::Vector3d& last_t0, 
                        const double& interval_tn, const double& interval_tn_1);
