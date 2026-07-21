@@ -1,79 +1,159 @@
- ROLO-SLAM:  
- Rotation-Optimized LiDAR-Only SLAM in Uneven Terrain with Ground Vehicle
-=
-ROLO-SLAM is a lightweight and robust LiDAR-based SLAM solution designed to improve the accuracy of pose estimation for ground vehicles in rough terrains. It incorporates several algorithmic innovations that reduce pose estimation drifts, particularly in the vertical direction, which are commonly observed when navigating uneven terrains. The method includes forward location prediction to coarsely eliminate the location differences between consecutive scans, enabling separate and accurate localization and orientation determination. Additionally, ROLO-SLAM features a parallel-capable spatial voxelization for correspondence matching, along with a spherical alignment-guided rotation registration to estimate vehicle rotation. By incorporating motion constraints into the optimization process, the algorithm enhances the rapid and effective estimation of LiDAR translation. Extensive experiments conducted across diverse environments demonstrate that ROLO-SLAM consistently achieves accurate pose estimation and outperforms existing state-of-the-art LiDAR SLAM solutions, making it a reliable choice for ground vehicle localization in perceptually-challenging environments.
-
 <div align="center">
-    <img src="https://github.com/sdwyc/ROLO/blob/main/doc/gif/4scenes-ezgif.com-video-to-gif-converter.gif" alt="GIF Description" width="500" />
+
+<!-- Adjust width (or add height) here to resize the title artwork. -->
+<img src="doc/img/rolo_title.svg" alt="ROLO" width="52%">
+
+
+<p>
+  A robust LiDAR-based SLAM system designed for ground-vehicle in rough and challenging environments.
+</p>
+
+<p>
+  <a href="#installation"><b>Installation</b></a> ·
+  <a href="#quick-start"><b>Quick Start</b></a> ·
+  <a href="#test-data"><b>Test Data</b></a> ·
+  <a href="#todo"><b>Roadmap</b></a> ·
+  <a href="#citation"><b>Citation</b></a>
+</p>
+
+<p>
+  <img alt="Ubuntu 18.04 / 20.04" src="https://img.shields.io/badge/Ubuntu-18.04%20%7C%2020.04-E95420?logo=ubuntu&logoColor=white">
+  <img alt="ROS Melodic / Noetic" src="https://img.shields.io/badge/ROS-Melodic%20%7C%20Noetic-22314E?logo=ros&logoColor=white">
+  <img alt="C++17" src="https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white">
+  <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green.svg">
+</p>
+
+<img src="./doc/img/off3_mapping_00.png" alt="ROLO demonstrations in off-road scenes" width="100%">
+
 </div>
 
-## Instructions
+---
 
-ROLO requires an input point cloud of type `sensor_msgs::PointCloud2` . 
-ROLO-SLAM mitigates vertical pose drift by dividing the front-end into three modules: forward location prediction for coarse translation estimation, voxelization matching for precise rotation estimation, and continuous-time translation estimation for improved accuracy. The back-end integrates scan-to-submap alignment and global factor graph optimization to enhance overall localization performance in challenging terrains.
+## Overview
+
+ROLO is a LiDAR-only SLAM system designed to reduce pose-estimation drift—especially vertical drift—when ground vehicles traverse uneven terrain. Its front end separates motion estimation into complementary stages, while its back end improves global consistency through scan-to-submap alignment and factor-graph optimization.
 
 <div align="center">
-    <img src="https://github.com/sdwyc/ROLO/blob/main/doc/img/platform_00.png" alt="Example Image" width="600" />
+  <img src="doc/img/system_overview_00.png" alt="ROLO system overview" width="82%">
+  <br>
+  <sub>System overview of the ROLO pipeline.</sub>
 </div>
 
-## Dependencies
+## Installation
 
-Our system has been tested extensively on both Ubuntu 18.04 with ROS Melodic and Ubuntu 20.04 with ROS Noetic, although other versions may work. The following configuration with required dependencies has been verified to be compatible:
--   Ubuntu 18.04 or 20.04
--   ROS Melodic or Noetic (`nav_msgs`, `cv_bridge`, `rospy`, `roscpp`,  `std_msgs`,  `sensor_msgs`,  `geometry_msgs`,  `pcl_ros`, `tf`, `visualization_msgs`, `message_generation`)
--   C++ 14
--   CMake >= `3.0.2`
--   OpenCV >= `4.10.0`
--   GTSAM >= `4.2.0`
--   Boost >= `1.71`
--   GCC >= `8.4.0` 
--   Point Cloud Library >= `1.10.0`
--   Eigen >= `3.3.7`
-## Compiling
+### Requirements
 
-Create a catkin workspace, clone the `ROLO` repository into the `src` folder, and compile via the [`catkin_make`](http://wiki.ros.org/catkin/commands/catkin_make) package :
+The following configurations have been tested:
+
+| Component | Version |
+|---|---|
+| ROS |  <img alt="ROS Melodic / Noetic" src="https://img.shields.io/badge/ROS1-noetic-red">   <img alt="ROS2 Humble" src="https://img.shields.io/badge/ROS2-humble-blue"> |
+| CMake | ≥ 3.0.2 |
+| OpenCV | ≥ 4.10.0 |
+| GTSAM | ≥ 4.2.0 |
+| Boost | ≥ 1.71 |
+| PCL | ≥ 1.10.0 |
+| Eigen | ≥ 3.3.7 |
+| OpenVDB (Optional) | ≥ 9.1.0 (Noetic) |
+
+ROS dependencies include `autoware_rviz_msgs`, `cv_bridge`, `geometry_msgs`, `jsk_recognition_msgs`, `nav_msgs`, `pcl_ros`, `sensor_msgs`, `std_msgs`, `tf`, `tf2`, and `visualization_msgs`.
+
+### Build from source
+
+Create a catkin workspace, clone this repository into its `src` directory, and build the workspace:
+
 ```bash
-mkdir rolo_ws && cd rolo_ws && mkdir src && cd src
+mkdir -p ~/rolo_ws/src && cd ~/rolo_ws/src
 git clone https://github.com/sdwyc/ROLO.git
 cd ..
 catkin_make
+source devel/setup.bash
 ```
 
+## Quick Start
 
-## Test Data
-For your convenience, we provide example test data [here](https://drive.google.com/file/d/1Xv8KFIYnK_ETduEiaSFqfBQGXi_yWvf8/view?usp=drive_link) (7 minutes, ~8.9GB). To run, first launch ROLO via:
-```
+### 1. Configure the LiDAR input
+
+Generally, ROLO only accepts point clouds as `sensor_msgs/PointCloud2` messages, The IMU messages `sensor_msgs/Imu` is optional for accracy improvement in loose coupling.
+
+Open [`config/params.yaml`](config/params.yaml) and set the point-cloud topic and sensor-related parameters for your platform. The launch file uses the `/base_link` and `/velodyne` frames by default; adjust the static transform in [`launch/rolo_run.launch`](launch/rolo_run.launch) when your frame names or extrinsics differ.
+
+### 2. Launch ROLO
+
+```bash
+source ~/rolo_ws/devel/setup.bash
 roslaunch rolo rolo_run.launch
 ```
-In a separate terminal session, play back the downloaded bag:
 
+### 3. Play a ROS bag
+
+Makesure point cloud topic is in your bag file!
+
+```bash
+rosbag play /path/to/your-bag.bag -r 1
 ```
-rosbag play your-bag.bag -r 1
-```
+
+## Test Data (deprecated)
+
+An off-road example ROS bag, which is available on [Google Drive](https://drive.google.com/file/d/1Xv8KFIYnK_ETduEiaSFqfBQGXi_yWvf88/view?usp=drive_link) (approximately 7 minutes and 8.9 GB). 
+
+> [!NOTE]
+> The example bag involves data sensitivity problem. Deprecated temporarily.
+
+## Results
+
 <div align="center">
-		 <img src="https://github.com/sdwyc/ROLO/blob/main/doc/img/off3_mapping_00.png" alt="Example Image" width="750" />
+  <img src="doc/gif/comparison_3-ezgif.com-video-to-gif-converter.gif" alt="ROLO qualitative comparison" width="72%">
+  <br>
+  <sub>Qualitative comparison in challenging terrain.</sub>
 </div>
 
+## Todo
+
+The following items summarize the current public roadmap:
+
+- [x] Add SGD-based rotation registration
+- [x] Add prior pose association and scan-context loop detection
+- [ ] Add IMU support
+- [ ] Refine the core code structure
+- [ ] Add ROS 2 support
+- [ ] Provide additional dataset-specific configurations
+
+
+Contributions and suggestions are welcome through [GitHub Issues](https://github.com/sdwyc/ROLO/issues).
+
 ## Citation
-Our work will be published in Journal of Field Robotics, if you found this work useful, please cite our manuscript:
+
+If ROLO is useful in your research, please cite:
+
 ```bibtex
 @article{wang2025rolo,
-  title={ROLO-SLAM: Rotation-Optimized LiDAR-Only SLAM in Uneven Terrain With Ground Vehicle},
+  title={ROLO-SLAM: rotation-optimized LiDAR-only SLAM in uneven terrain with ground vehicle},
   author={Wang, Yinchuan and Ren, Bin and Zhang, Xiang and Wang, Pengyu and Wang, Chaoqun and Song, Rui and Li, Yibin and Meng, Max Q-H},
   journal={Journal of Field Robotics},
+  volume={42},
+  number={3},
+  pages={880--902},
   year={2025},
   publisher={Wiley Online Library}
 }
 ```
 
 ## Acknowledgements
-We thank the authors of the  [FastGICP](https://github.com/SMRT-AIST/fast_gicp)  and  [LIO-SAM](https://github.com/TixiaoShan/LIO-SAM)  open-source packages:
+This project builds on ideas and open-source software from:
 
--   Kenji Koide, Masashi Yokozuka, Shuji Oishi, and Atsuhiko Banno, “Voxelized GICP for Fast and Accurate 3D Point Cloud Registration,” in  _IEEE International Conference on Robotics and Automation (ICRA)_, IEEE, 2021, pp. 11 054–11 059.
--   T. Shan, B. Englot, D. Meyers, W. Wang, C. Ratti and D. Rus, "LIO-SAM: Tightly-coupled Lidar Inertial Odometry via Smoothing and Mapping," _2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)_, Las Vegas, NV, USA, 2020, pp. 5135-5142, doi: 10.1109/IROS45743.2020.9341176.
+- [FastGICP](https://github.com/SMRT-AIST/fast_gicp) — K. Koide, M. Yokozuka, S. Oishi, and A. Banno, “Voxelized GICP for Fast and Accurate 3D Point Cloud Registration,” *IEEE ICRA*, 2021.
+- [LIO-SAM](https://github.com/TixiaoShan/LIO-SAM) — T. Shan, B. Englot, D. Meyers, W. Wang, C. Ratti, and D. Rus, “LIO-SAM: Tightly-coupled Lidar Inertial Odometry via Smoothing and Mapping,” *IEEE/RSJ IROS*, 2020.
+- [Scan Context](https://github.com/gisbi-kim/scancontext) — Kim G, Choi S, Kim A. Scan context++: Structural place recognition robust to rotation and lateral variations in urban environments[J]. IEEE Transactions on Robotics, 2021, 38(3): 1856-1874.
+
+We sincerely thank the authors and maintainers of these projects.
 
 ## License
-This work is licensed under the terms of the MIT license.
+
+This project is released under the [MIT License](https://opensource.org/licenses/MIT).
+
+---
+
 <div align="center">
-    <img src="https://github.com/sdwyc/ROLO/blob/main/doc/gif/comparison_3-ezgif.com-video-to-gif-converter.gif" alt="GIF Description" width="500" />
+  <sub>If you find this project helpful, consider giving it a ⭐.</sub>
 </div>

@@ -1,0 +1,95 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-labelledby="title description"
+  viewBox="0 0 900 300"
+>
+  <title id="title">ROLO</title>
+  <desc id="description">ROLO rendered as textured gold off-road lettering</desc>
+
+  <style>
+    .rolo-text {
+      font-family: Impact, "Arial Black", "Arial Narrow", sans-serif;
+      font-size: 210px;
+      font-weight: 900;
+      letter-spacing: -5px;
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="gold-gradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f1d398"/>
+      <stop offset="18%" stop-color="#cfa85d"/>
+      <stop offset="50%" stop-color="#a97931"/>
+      <stop offset="78%" stop-color="#d0a861"/>
+      <stop offset="100%" stop-color="#7b501f"/>
+    </linearGradient>
+
+    <pattern id="gold-dots" width="10" height="10" patternUnits="userSpaceOnUse">
+      <rect width="10" height="10" fill="url(#gold-gradient)"/>
+      <circle cx="2" cy="2" r="1.3" fill="#704619" opacity="0.55"/>
+      <circle cx="7" cy="7" r="1" fill="#ffe4ac" opacity="0.45"/>
+    </pattern>
+
+    <filter id="logo-shadow" x="-20%" y="-30%" width="150%" height="180%">
+      <feDropShadow
+        dx="0"
+        dy="13"
+        stdDeviation="3"
+        flood-color="#000000"
+        flood-opacity="0.9"
+      />
+    </filter>
+
+    <filter id="inner-depth" x="-10%" y="-20%" width="120%" height="150%">
+      <feOffset dx="0" dy="7" result="offset"/>
+      <feGaussianBlur in="offset" stdDeviation="2.5" result="blur"/>
+      <feComposite in="blur" in2="SourceAlpha" operator="in" result="inner-shadow"/>
+      <feFlood flood-color="#241305" flood-opacity="0.8" result="shadow-color"/>
+      <feComposite in="shadow-color" in2="inner-shadow" operator="in" result="colored-shadow"/>
+      <feMerge>
+        <feMergeNode in="SourceGraphic"/>
+        <feMergeNode in="colored-shadow"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g text-anchor="middle" filter="url(#logo-shadow)">
+    <text
+      x="450" y="225" class="rolo-text" textLength="700"
+      lengthAdjust="spacingAndGlyphs" fill="none" stroke="#090806"
+      stroke-width="34" stroke-linejoin="round" paint-order="stroke"
+    >ROLO</text>
+    <text
+      x="450" y="225" class="rolo-text" textLength="700"
+      lengthAdjust="spacingAndGlyphs" fill="none" stroke="#fffdf5"
+      stroke-width="27" stroke-linejoin="round" paint-order="stroke"
+    >ROLO</text>
+    <text
+      x="450" y="225" class="rolo-text" textLength="700"
+      lengthAdjust="spacingAndGlyphs" fill="none" stroke="#15120e"
+      stroke-width="17" stroke-linejoin="round" paint-order="stroke"
+    >ROLO</text>
+    <text
+      x="450" y="225" class="rolo-text" textLength="700"
+      lengthAdjust="spacingAndGlyphs" fill="none" stroke="#e1bd77"
+      stroke-width="10" stroke-linejoin="round" paint-order="stroke"
+    >ROLO</text>
+    <text
+      x="450" y="225" class="rolo-text" textLength="700"
+      lengthAdjust="spacingAndGlyphs" fill="none" stroke="#241a10"
+      stroke-width="5" stroke-linejoin="round" paint-order="stroke"
+    >ROLO</text>
+    <text
+      x="450" y="225" class="rolo-text" textLength="700"
+      lengthAdjust="spacingAndGlyphs" fill="url(#gold-dots)" stroke="#f4d99f"
+      stroke-width="2" stroke-linejoin="round" paint-order="stroke fill"
+      filter="url(#inner-depth)"
+    >ROLO</text>
+    <text
+      x="450" y="220" class="rolo-text" textLength="700"
+      lengthAdjust="spacingAndGlyphs" fill="none" stroke="#fff0c7"
+      stroke-width="1.5" stroke-opacity="0.65"
+    >ROLO</text>
+  </g>
+</svg>
