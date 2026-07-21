@@ -6,7 +6,6 @@ Panels:
       Expanded:
         - /Global Options1
         - /Mapping1/Loop constraint1/Namespaces1
-        - /PriorPose1/Segmented_ground1
       Splitter Ratio: 0.5616045594215393
     Tree Height: 611
   - Class: rviz/Selection
@@ -531,7 +530,7 @@ Visualization Manager:
         - Alpha: 1
           Buffer Length: 1
           Class: rviz/Path
-          Color: 0; 255; 0
+          Color: 0; 255; 255
           Enabled: true
           Head Diameter: 0.30000001192092896
           Head Length: 0.20000000298023224
@@ -609,8 +608,7 @@ Visualization Manager:
           Marker Topic: /rolo/mapping/loop_closure_constraints
           Name: Loop constraint
           Namespaces:
-            loop_edges: true
-            loop_nodes: true
+            {}
           Queue Size: 100
           Value: true
         - Class: rviz/MarkerArray
@@ -721,7 +719,7 @@ Visualization Manager:
           alpha method: flat
           alpha min: 0
           color: 25; 255; 0
-          coloring: Label
+          coloring: Flat color
           line width: 0.05000000074505806
           only edge: true
           show coords: true
@@ -762,6 +760,23 @@ Visualization Manager:
             prior_pose: true
           Queue Size: 100
           Value: true
+        - Class: jsk_rviz_plugin/BoundingBoxArray
+          Enabled: true
+          Name: Prior_History
+          Queue Size: 100
+          Topic: /rolo/mapping/prior_pose_history
+          Unreliable: false
+          Value: true
+          alpha: 0.800000011920929
+          alpha max: 1
+          alpha method: flat
+          alpha min: 0
+          color: 239; 41; 41
+          coloring: Flat color
+          line width: 0.05000000074505806
+          only edge: true
+          show coords: true
+          value threshold: 0
       Enabled: true
       Name: PriorPose
     - Alpha: 1
@@ -808,7 +823,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 33.51964569091797
+      Distance: 38.894283294677734
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -824,9 +839,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.37980103492736816
+      Pitch: 0.32480093836784363
       Target Frame: base_link
-      Yaw: 4.021359920501709
+      Yaw: 5.246401309967041
     Saved: ~
 Window Geometry:
   Displays:
@@ -844,5 +859,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1848
-  X: 1992
+  X: 2632
   Y: 27

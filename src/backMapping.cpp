@@ -86,6 +86,7 @@ public:
     ros::Publisher pubGlobalGraph;
     ros::Publisher pubLoopConstraintEdge;
     ros::Publisher pubPriorPredictions;
+    ros::Publisher pubPriorPoseHistory;
     ros::Publisher pubPriorPatches;
     ros::Publisher pubCurrentPatch;
 
@@ -167,7 +168,7 @@ public:
     int laserCloudCornerLastDSNum = 0;
     int laserCloudSurfLastDSNum = 0;
     bool aPriorPose = false;
-    deque<pair<std::array<double, 6>, pcl::PointCloud<GroundPatchType>>> priorPosePatchHistory;
+    deque<pair<std::array<double, 6>, pcl::PointCloud<GroundPatchType>>> priorPosePatchQueue;
     deque<pair<double, int>> priorTimeKeyQueue;
     vector<pair<int, int>> priorIndexQueue;  // Matched prior loop pair
     map<int, pair<int, std::array<float, 6>>> priorVisContainer; // key: current key, value.first: linked key, value.second: linked_pose -> prior_pose relative transform
@@ -218,6 +219,7 @@ public:
         pubGlobalGraph        = nh.advertise<visualization_msgs::MarkerArray>("rolo/mapping/global_graph", 1);
         pubLoopConstraintEdge = nh.advertise<visualization_msgs::MarkerArray>("/rolo/mapping/loop_closure_constraints", 1);
         pubPriorPredictions   = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>("/rolo/mapping/prior_predictions", 1);
+        pubPriorPoseHistory   = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>("/rolo/mapping/prior_pose_history", 1);
         pubPriorPatches       = nh.advertise<sensor_msgs::PointCloud2>("/rolo/mapping/prior_patches", 1);
         pubCurrentPatch       = nh.advertise<sensor_msgs::PointCloud2>("extracted_patch_current", 1);
         // Associated keyframe clouds
@@ -507,7 +509,7 @@ public:
             static_cast<double>(priorPoseCur[5]),
         };
         mtx.lock();
-        priorPosePatchHistory.push_back(std::make_pair(prior_pose, prior_ground_patch));
+        priorPosePatchQueue.push_back(std::make_pair(prior_pose, prior_ground_patch));
         priorTimeKeyQueue.push_back(std::make_pair(msgTime, latestKeyID));
         mtx.unlock();
     }
@@ -1474,6 +1476,7 @@ public:
             // Global map publisher
             publishGlobalMap();
             publishGlobalGraph();
+            publishePriorPoseHistory();
         }
 
         if (savePCD == false)
@@ -1934,7 +1937,7 @@ public:
                 performRSLoopClosure();
             }
             // Visualization
-            visualizeLoopClosure();
+            // visualizeLoopClosure();
         }
     }
 
@@ -1954,28 +1957,28 @@ public:
 
     void performPriorAssociation()
     {
-        // priorFilter();
+        priorFilter();
 
-        printf("Prior pose size: %zu\n", priorPosePatchHistory.size());
-        if (cloudKeyPoses6D->points.empty() || priorPosePatchHistory.empty())
+        printf("Prior pose size: %zu\n", priorPosePatchQueue.size());
+        if (cloudKeyPoses6D->points.empty() || priorPosePatchQueue.empty())
             return;
 
         pcl::PointCloud<PointTypePose>::Ptr copy_KeyPoses6D;
         copy_KeyPoses6D.reset(new pcl::PointCloud<PointTypePose>());
-        std::deque<std::pair<std::array<double, 6>, pcl::PointCloud<GroundPatchType>>> copy_priorPosePatchHistory;
+        std::deque<std::pair<std::array<double, 6>, pcl::PointCloud<GroundPatchType>>> copy_priorPosePatchQueue;
         std::deque<std::pair<double, int>> copy_priorTimeKeyQueue;
         mtx.lock();
         // Thread count
         *copy_KeyPoses6D = *cloudKeyPoses6D;
-        copy_priorPosePatchHistory = priorPosePatchHistory;
+        copy_priorPosePatchQueue = priorPosePatchQueue;
         copy_priorTimeKeyQueue = priorTimeKeyQueue;
         mtx.unlock();
 
         
         // Protect shared resources
-        auto pose_patch_iterator = copy_priorPosePatchHistory.cbegin();
+        auto pose_patch_iterator = copy_priorPosePatchQueue.cbegin();
         auto time_key_iterator = copy_priorTimeKeyQueue.cbegin();
-        while (pose_patch_iterator != copy_priorPosePatchHistory.cend() &&
+        while (pose_patch_iterator != copy_priorPosePatchQueue.cend() &&
                time_key_iterator != copy_priorTimeKeyQueue.cend())
         {
             int linked_key_id = time_key_iterator->second;
@@ -2121,7 +2124,7 @@ public:
                 
             }
 
-            // priorPosePatchHistory.pop_front();
+            // priorPosePatchQueue.pop_front();
             // priorTimeKeyQueue.pop_front();
             ++pose_patch_iterator;
             ++time_key_iterator;
@@ -2135,26 +2138,38 @@ public:
     {
         mtx.lock();
 
-        // while (priorPosePatchHistory.size() > priorTimeKeyQueue.size())
-        //     priorPosePatchHistory.pop_back();
-        // while (priorTimeKeyQueue.size() > priorPosePatchHistory.size())
-        //     priorTimeKeyQueue.pop_back();
+        if (cloudKeyPoses6D->empty())
+        {
+            mtx.unlock();
+            return;
+        }
 
-        auto pose_patch_iterator = priorPosePatchHistory.begin();
+        while (priorPosePatchQueue.size() > priorTimeKeyQueue.size())
+            priorPosePatchQueue.pop_back();
+        while (priorTimeKeyQueue.size() > priorPosePatchQueue.size())
+            priorTimeKeyQueue.pop_back();
+
+        auto pose_patch_iterator = priorPosePatchQueue.begin();
         auto time_key_iterator = priorTimeKeyQueue.begin();
-        while (pose_patch_iterator != priorPosePatchHistory.end() &&
+        while (pose_patch_iterator != priorPosePatchQueue.end() &&
                time_key_iterator != priorTimeKeyQueue.end())
         {
             double time_diff = std::abs(time_key_iterator->first - timeLaserInfoCur);
             std::array<double, 6> &prior_pose = pose_patch_iterator->first;
-            double range_diff =
-                std::sqrt((prior_pose[3] - transformTobeMapped[3]) * (prior_pose[3] - transformTobeMapped[3]) +
-                          (prior_pose[4] - transformTobeMapped[4]) * (prior_pose[4] - transformTobeMapped[4]) +
-                          (prior_pose[5] - transformTobeMapped[5]) * (prior_pose[5] - transformTobeMapped[5]));
+            int linked_key_id = time_key_iterator->second;
+
+            Eigen::Affine3f linked_key_pose = pclPointToAffine3f(cloudKeyPoses6D->points[linked_key_id]);
+            Eigen::Affine3f relative_prior_pose = pcl::getTransformation(
+                prior_pose[3], prior_pose[4], prior_pose[5],
+                prior_pose[0], prior_pose[1], prior_pose[2]);
+            Eigen::Affine3f global_prior_pose = linked_key_pose * relative_prior_pose;
+            Eigen::Affine3f current_key_pose = trans2Affine3f(transformTobeMapped);
+
+            double range_diff = (global_prior_pose.translation() - current_key_pose.translation()).norm();
 
             if (time_diff > priorTimeValidation || range_diff > priorRangeValidation)
             {
-                pose_patch_iterator = priorPosePatchHistory.erase(pose_patch_iterator);
+                pose_patch_iterator = priorPosePatchQueue.erase(pose_patch_iterator);
                 time_key_iterator = priorTimeKeyQueue.erase(time_key_iterator);
                 continue;
             }
@@ -2231,18 +2246,18 @@ public:
         box_array.header.stamp = timeLaserInfoStamp;
 
         pcl::PointCloud<PointTypePose>::Ptr copy_KeyPoses6D(new pcl::PointCloud<PointTypePose>());
-        std::deque<std::pair<std::array<double, 6>, pcl::PointCloud<GroundPatchType>>> copy_priorPosePatchHistory;
+        std::deque<std::pair<std::array<double, 6>, pcl::PointCloud<GroundPatchType>>> copy_priorPosePatchQueue;
         std::deque<std::pair<double, int>> copy_priorTimeKeyQueue;
         mtx.lock();
         *copy_KeyPoses6D = *cloudKeyPoses6D;
-        copy_priorPosePatchHistory = priorPosePatchHistory;
+        copy_priorPosePatchQueue = priorPosePatchQueue;
         copy_priorTimeKeyQueue = priorTimeKeyQueue;
         mtx.unlock();
 
         pcl::PointCloud<GroundPatchType>::Ptr stacked_prior_patches(new pcl::PointCloud<GroundPatchType>());
-        auto pose_patch_iterator = copy_priorPosePatchHistory.cbegin();
+        auto pose_patch_iterator = copy_priorPosePatchQueue.cbegin();
         auto time_key_iterator = copy_priorTimeKeyQueue.cbegin();
-        while (pose_patch_iterator != copy_priorPosePatchHistory.cend() &&
+        while (pose_patch_iterator != copy_priorPosePatchQueue.cend() &&
                time_key_iterator != copy_priorTimeKeyQueue.cend())
         {
             const int linked_key_id = time_key_iterator->second;
@@ -2263,10 +2278,6 @@ public:
 
             pcl::PointCloud<GroundPatchType> global_patch;
             pcl::transformPointCloud(pose_patch_iterator->second, global_patch, global_prior_pose);
-            // for (auto &pt : global_patch.points)
-            // {
-            //     pt.intensity = static_cast<float>(prior_id);
-            // }
             *stacked_prior_patches += global_patch;
 
             ++pose_patch_iterator;
@@ -2275,6 +2286,55 @@ public:
 
         pubPriorPredictions.publish(box_array);
         publishCloud(pubPriorPatches, stacked_prior_patches, timeLaserInfoStamp, odometryFrame);
+    }
+
+    void publishePriorPoseHistory(){
+        if (pubPriorPoseHistory.getNumSubscribers() == 0)
+            return;
+
+        pcl::PointCloud<PointTypePose>::Ptr copy_KeyPoses6D(new pcl::PointCloud<PointTypePose>());
+        std::map<int, std::pair<int, std::array<float, 6>>> priorVisContainerCopy;
+        ros::Time markerStamp;
+
+        mtx.lock();
+        if (cloudKeyPoses6D->points.empty() || priorVisContainer.empty())
+        {
+            mtx.unlock();
+            return;
+        }
+
+        *copy_KeyPoses6D = *cloudKeyPoses6D;
+        priorVisContainerCopy = priorVisContainer;
+        markerStamp = timeLaserInfoStamp;
+        mtx.unlock();
+
+        jsk_recognition_msgs::BoundingBoxArray box_array;
+        box_array.header.frame_id = odometryFrame;
+        box_array.header.stamp = markerStamp;
+
+        for (const auto &prior_pair : priorVisContainerCopy)
+        {
+            const int key_cur = prior_pair.first;
+            const int key_linked = prior_pair.second.first;
+            const std::array<float, 6> &relative_prior_pose_array = prior_pair.second.second;
+            if (key_cur < 0 || key_linked < 0 ||
+                key_cur >= static_cast<int>(copy_KeyPoses6D->points.size()) ||
+                key_linked >= static_cast<int>(copy_KeyPoses6D->points.size()))
+            {
+                continue;
+            }
+
+            Eigen::Affine3f linked_key_pose = pclPointToAffine3f(copy_KeyPoses6D->points[key_linked]);
+            Eigen::Affine3f relative_prior_pose = pcl::getTransformation(
+                relative_prior_pose_array[3], relative_prior_pose_array[4], relative_prior_pose_array[5],
+                relative_prior_pose_array[0], relative_prior_pose_array[1], relative_prior_pose_array[2]);
+            Eigen::Affine3f global_prior_pose = linked_key_pose * relative_prior_pose;
+
+            box_array.boxes.push_back(buildPriorBoundingBox(global_prior_pose, key_linked, markerStamp));
+            box_array.boxes.back().label = key_cur;
+        }
+
+        pubPriorPoseHistory.publish(box_array);
     }
 
     //! Loop closure
