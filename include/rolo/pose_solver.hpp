@@ -3,9 +3,14 @@
 #define ROLO_POSE_SOLVER_HPP_
 #define PCL_NO_PRECOMPILE
 
-#include "rolo/utility.h"
+#include "rolo/utils/point_type.hpp"
 
 #include <sensor_msgs/PointCloud2.h>
+
+#ifdef USE_UNORDERED_MAP
+#undef USE_UNORDERED_MAP
+#endif
+#define USE_UNORDERED_MAP 0
 
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/point_cloud.h>

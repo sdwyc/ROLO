@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-#include "rolo/utility.h"
+#include "utility.hpp"
 #include "rolo/pose_solver.hpp"
 #include "rolo/CloudInfoStamp.h"
 

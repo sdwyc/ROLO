@@ -10,7 +10,6 @@
 #include <Eigen/StdVector>
 
 #include "rolo/eskf/IKFoM_toolkit/esekfom/esekfom.hpp"
-#include "rolo/utility.h"
 
 namespace rolo {
 namespace eskf {

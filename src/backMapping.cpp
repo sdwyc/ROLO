@@ -1,4 +1,4 @@
-#include "rolo/utility.h"
+#include "utility.hpp"
 // #include "rolo/save_map.h"
 #include "rolo/pose_solver.hpp"
 #include "scancontext/Scancontext.h"
@@ -18,6 +18,9 @@
 
 #include <gtsam/nonlinear/ISAM2.h>
 #include <ros/package.h>
+#include <opencv2/core/eigen.hpp>
+#include <opencv2/opencv.hpp>
+#include <pcl/registration/icp.h>
 
 using namespace gtsam;
 
@@ -38,28 +41,6 @@ SCInputType ParseSCInputType(const std::string &sc_input_type)
     return SCInputType::SCAN_RAW;
 }
 
-
-/*
-* A point cloud type that has 6D pose info ([x,y,z,roll,pitch,yaw] intensity is time stamp)
-*/
-struct PointXYZIRPYT
-{
-    PCL_ADD_POINT4D
-    PCL_ADD_INTENSITY;                  // preferred way of adding a XYZ+padding
-    float roll;
-    float pitch;
-    float yaw;
-    double time;
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW   // make sure our new allocators are aligned
-} EIGEN_ALIGN16;                    // enforce SSE padding for correct memory alignment
-
-POINT_CLOUD_REGISTER_POINT_STRUCT (PointXYZIRPYT,
-                                   (float, x, x) (float, y, y)
-                                   (float, z, z) (float, intensity, intensity)
-                                   (float, roll, roll) (float, pitch, pitch) (float, yaw, yaw)
-                                   (double, time, time))
-
-typedef PointXYZIRPYT  PointTypePose;
 
 class backMapping : public ParamLoader
 {
@@ -320,41 +301,6 @@ public:
         }
         return cloudOut;
     }
-    //! Convert PCL point to GTSAM Pose3
-    gtsam::Pose3 pclPointTogtsamPose3(PointTypePose thisPoint)
-    {
-        return gtsam::Pose3(gtsam::Rot3::RzRyRx(double(thisPoint.roll), double(thisPoint.pitch), double(thisPoint.yaw)),
-                                  gtsam::Point3(double(thisPoint.x),    double(thisPoint.y),     double(thisPoint.z)));
-    }
-    //! Convert pose array to GTSAM Pose3
-    gtsam::Pose3 trans2gtsamPose(float transformIn[])
-    {
-        return gtsam::Pose3(gtsam::Rot3::RzRyRx(transformIn[0], transformIn[1], transformIn[2]), 
-                                  gtsam::Point3(transformIn[3], transformIn[4], transformIn[5]));
-    }
-    //! Convert 6D pose to Eigen transform
-    Eigen::Affine3f pclPointToAffine3f(PointTypePose thisPoint)
-    {
-        return pcl::getTransformation(thisPoint.x, thisPoint.y, thisPoint.z, thisPoint.roll, thisPoint.pitch, thisPoint.yaw);
-    }
-    //! Convert pose transform to Eigen matrix
-    Eigen::Affine3f trans2Affine3f(float transformIn[])
-    {
-        return pcl::getTransformation(transformIn[3], transformIn[4], transformIn[5], transformIn[0], transformIn[1], transformIn[2]);
-    }
-    //! Format conversion
-    PointTypePose trans2PointTypePose(float transformIn[])
-    {
-        PointTypePose thisPose6D;
-        thisPose6D.x = transformIn[3];
-        thisPose6D.y = transformIn[4];
-        thisPose6D.z = transformIn[5];
-        thisPose6D.roll  = transformIn[0];
-        thisPose6D.pitch = transformIn[1];
-        thisPose6D.yaw   = transformIn[2];
-        return thisPose6D;
-    }
-
     void allocateMemory(){
         cloudKeyPoses3D.reset(new pcl::PointCloud<PointType>());
         cloudKeyPoses6D.reset(new pcl::PointCloud<PointTypePose>());
@@ -1048,9 +994,9 @@ public:
         transformTobeMapped[5] += matX.at<float>(5, 0);
         // Update current pose by delta
         float deltaR = sqrt(
-                            pow(pcl::rad2deg(matX.at<float>(0, 0)), 2) +
-                            pow(pcl::rad2deg(matX.at<float>(1, 0)), 2) +
-                            pow(pcl::rad2deg(matX.at<float>(2, 0)), 2));
+                            pow(radTodeg(matX.at<float>(0, 0)), 2) +
+                            pow(radTodeg(matX.at<float>(1, 0)), 2) +
+                            pow(radTodeg(matX.at<float>(2, 0)), 2));
         float deltaT = sqrt(
                             pow(matX.at<float>(3, 0) * 100, 2) +
                             pow(matX.at<float>(4, 0) * 100, 2) +

@@ -1,130 +1,20 @@
 #pragma once
-#ifndef _UTILITY_LIDAR_ODOMETRY_H_
-#define _UTILITY_LIDAR_ODOMETRY_H_
-#define PCL_NO_PRECOMPILE 
+#ifndef ROLO_UTILS_PARAM_LOADER_HPP_
+#define ROLO_UTILS_PARAM_LOADER_HPP_
 
-#include <ros/ros.h>
+#include "rolo/utils/point_type.hpp"
 
-#include <std_msgs/Header.h>
-#include <std_msgs/Float64MultiArray.h>
-#include <sensor_msgs/Imu.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/NavSatFix.h>
-#include <jsk_recognition_msgs/BoundingBoxArray.h>
-#include <nav_msgs/Odometry.h>
-#include <nav_msgs/Path.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
-#include <geometry_msgs/PoseStamped.h>
-
-// #include <opencv/cv.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <pcl/search/impl/search.hpp>
-#include <pcl/range_image/range_image.h>
-#include <pcl/kdtree/kdtree_flann.h>
-#include <pcl/common/common.h>
-#include <pcl/common/transforms.h>
-#include <pcl/registration/icp.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/filters/filter.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/filters/crop_box.h> 
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/features/normal_3d_omp.h>
-#include <pcl/features/fpfh_omp.h>
-#include <flann/flann.hpp>
-#include <tf/LinearMath/Quaternion.h>
-#include <tf/transform_listener.h>
-#include <tf/transform_datatypes.h>
-#include <tf/transform_broadcaster.h>
- 
-#include <vector>
-#include <cmath>
-#include <cctype>
 #include <algorithm>
-#include <queue>
-#include <deque>
-#include <iostream>
-#include <fstream>
-#include <ctime>
+#include <cctype>
 #include <cfloat>
-#include <iterator>
-#include <sstream>
-#include <string>
+#include <cmath>
 #include <limits>
-#include <iomanip>
-#include <array>
-#include <thread>
-#include <mutex>
-#include "rolo/CloudInfoStamp.h"
-#include <opencv2/opencv.hpp>
-#include <eigen3/Eigen/Dense>
-using namespace std;
+#include <string>
+#include <vector>
 
-using PoseVector = Eigen::Matrix<double, 7, 1>;
-using PoseVectorList = std::vector<PoseVector, Eigen::aligned_allocator<PoseVector>>;
-
-#ifndef HasRGB
-#define HasRGB 1
-#endif
-
-struct EIGEN_ALIGN16 PointXYZIRGB
-{
-    PCL_ADD_POINT4D;
-    PCL_ADD_INTENSITY;
-    PCL_ADD_RGB;
-
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    inline PointXYZIRGB()
-    {
-      x = y = z = 0.0f;
-      data[3] = 1.0f;
-      intensity = 0.0f;
-      rgb = 0.0f;
-    }
-};
-
-POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIRGB,
-    (float,x,x)
-    (float,y,y)
-    (float,z,z)
-    (float,intensity,intensity)
-    (float,rgb,rgb)
-)
-
-#if HasRGB
-typedef PointXYZIRGB PointType;
-#else
-typedef pcl::PointXYZI PointType;
-#endif
-
-enum class lidarType { VELODYNE, OUSTER };
-
-struct EIGEN_ALIGN16 GroundPatchType
-{
-    PCL_ADD_POINT4D;
-    float intensity;
-    float timestamp;
-    std::uint8_t label;
-
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    inline GroundPatchType()
-    {
-      x = y = z = timestamp = 0.0f;
-      intensity = 0.0f;
-      label = 0;
-    }
-};
-
-POINT_CLOUD_REGISTER_POINT_STRUCT(GroundPatchType,
-	(float,x,x)
-	(float,y,y)
-	(float,z,z)
-	(float,intensity,intensity)
-	(float,timestamp,timestamp)
-	(std::uint8_t,label,label)
-)
+#include <Eigen/Dense>
+#include <ros/ros.h>
+#include <unistd.h>
 
 inline Eigen::Vector3d LoadVector3Param(ros::NodeHandle &nh, const std::string &name,
                                         const Eigen::Vector3d &fallback)
@@ -182,20 +72,20 @@ public:
 
     std::string robot_id;
 
-    //Topics
-    string pointCloudTopic; // Input point cloud topic
-    string odomTopic;
+    // Topics
+    std::string pointCloudTopic;
+    std::string odomTopic;
 
-    //Frames
-    string lidarFrame;
-    string baselinkFrame;
-    string odometryFrame;
-    string mapFrame;
+    // Frames
+    std::string lidarFrame;
+    std::string baselinkFrame;
+    std::string odometryFrame;
+    std::string mapFrame;
     std::vector<double> initPose;
 
     // Save pcd
     bool savePCD;
-    string savePCDDirectory;
+    std::string savePCDDirectory;
 
     // Lidar Sensor Configuration
     lidarType sensor;
@@ -213,12 +103,12 @@ public:
     int edgeFeatureMinValidNum;
     int surfFeatureMinValidNum;
 
-    // voxel filter paprams
+    // Voxel filter params
     float odometrySurfLeafSize;
     float mappingCornerLeafSize;
-    float mappingSurfLeafSize ;
+    float mappingSurfLeafSize;
 
-    float z_tollerance; 
+    float z_tollerance;
     float rotation_tollerance;
 
     // CPU Params
@@ -229,22 +119,22 @@ public:
     float CT_lambda;
 
     // Surrounding map
-    float surroundingkeyframeAddingDistThreshold; 
-    float surroundingkeyframeAddingAngleThreshold; 
+    float surroundingkeyframeAddingDistThreshold;
+    float surroundingkeyframeAddingAngleThreshold;
     float surroundingKeyframeDensity;
     float surroundingKeyframeSearchRadius;
-    
+
     // Loop closure
-    bool  loopClosureEnableFlag; // Enable loop closure
+    bool loopClosureEnableFlag;
     std::string loopCloseType;
     std::string scInputType;
-    float loopClosureFrequency; // Loop closure rate
-    int   surroundingKeyframeSize;
+    float loopClosureFrequency;
+    int surroundingKeyframeSize;
     float historyKeyframeSearchRadius;
     float historyKeyframeSearchTimeDiff;
-    int   historyKeyframeSearchNum;
+    int historyKeyframeSearchNum;
     float historyKeyframeFitnessScore;
-    bool  priorFactorEnableFlag;
+    bool priorFactorEnableFlag;
     float priorFactorFrequency;
     float groundPatchSize;
     float nearPriorRadius;
@@ -292,11 +182,11 @@ public:
     double priorVehicleSizeX;
     double priorVehicleSizeY;
 
-    // global map visualization radius
+    // Global map visualization
     float globalMapVisualizationSearchRadius;
     float globalMapVisualizationPoseDensity;
     float globalMapVisualizationLeafSize;
-    // Load parameters
+
     ParamLoader(bool requireSensorConfig = true)
     {
         nh.param<std::string>("/robot_id", robot_id, "roboat");
@@ -308,10 +198,9 @@ public:
         nh.param<std::string>("rolo/baselinkFrame", baselinkFrame, "base_link");
         nh.param<std::string>("rolo/odometryFrame", odometryFrame, "odom");
         nh.param<std::string>("rolo/mapFrame", mapFrame, "map");
-        nh.param<vector<double>>("rolo/initPose", initPose, vector<double>());
-        for(std::size_t i = 3; i < initPose.size(); ++i){
-          initPose[i] = initPose[i] * (M_PI/180.0);
-        }
+        nh.param<std::vector<double>>("rolo/initPose", initPose, std::vector<double>());
+        for (std::size_t i = 3; i < initPose.size(); ++i)
+            initPose[i] = initPose[i] * (M_PI / 180.0);
 
         nh.param<bool>("rolo/savePCD", savePCD, false);
         nh.param<std::string>("rolo/savePCDDirectory", savePCDDirectory, "/Downloads/LOAM/");
@@ -326,16 +215,11 @@ public:
         {
             sensor = lidarType::OUSTER;
         }
-        // else if (sensorStr == "livox")
-        // {
-        //     sensor = lidarType::LIVOX;
-        // }
         else
         {
             if (requireSensorConfig)
             {
-                ROS_ERROR_STREAM(
-                    "Invalid sensor type (must be either 'velodyne' or 'ouster' or 'livox'): " << sensorStr);
+                ROS_ERROR_STREAM("Invalid sensor type (must be either 'velodyne' or 'ouster' or 'livox'): " << sensorStr);
                 ros::shutdown();
             }
             else
@@ -368,7 +252,7 @@ public:
         nh.param<double>("rolo/mappingProcessInterval", mappingProcessInterval, 0.15);
 
         nh.param<float>("rolo/continuousTrajectoryWeight", CT_lambda, 1.0);
-        
+
         nh.param<float>("rolo/surroundingkeyframeAddingDistThreshold", surroundingkeyframeAddingDistThreshold, 1.0);
         nh.param<float>("rolo/surroundingkeyframeAddingAngleThreshold", surroundingkeyframeAddingAngleThreshold, 0.2);
         nh.param<float>("rolo/surroundingKeyframeDensity", surroundingKeyframeDensity, 1.0);
@@ -468,87 +352,4 @@ public:
     }
 };
 
-template<typename T>
-sensor_msgs::PointCloud2 publishCloud(const ros::Publisher& thisPub, const T& thisCloud, ros::Time thisStamp, std::string thisFrame)
-{
-    sensor_msgs::PointCloud2 tempCloud;
-    pcl::toROSMsg(*thisCloud, tempCloud);
-    tempCloud.header.stamp = thisStamp;
-    tempCloud.header.frame_id = thisFrame;
-    if (thisPub.getNumSubscribers() != 0)
-        thisPub.publish(tempCloud);
-    return tempCloud;
-}
-
-template<typename T>
-double GET_ROS_TIMESTAMP(T msg)
-{
-    return msg->header.stamp.toSec();
-}
-
-inline double radTodeg(double radians)
-{
-  return radians * 180.0 / M_PI;
-}
-
-inline double degTorad(double degrees)
-{
-  return degrees * M_PI / 180.0;
-}
-
-inline float pointDistance(PointType p)
-{
-    return sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
-}
-
-
-inline float pointDistance(PointType p1, PointType p2)
-{
-    return sqrt((p1.x-p2.x)*(p1.x-p2.x) + (p1.y-p2.y)*(p1.y-p2.y) + (p1.z-p2.z)*(p1.z-p2.z));
-}
-
-/**
- * Remove one row from matrix.
- * Credit to: https://stackoverflow.com/questions/13290395
- * @param matrix an Eigen::Matrix.
- * @param rowToRemove index of row to remove. If >= matrix.rows(), no operation will be taken
- */
-template <class T, int R, int C>
-void removeRow(Eigen::Matrix<T, R, C>& matrix, unsigned int rowToRemove) {
-  if (rowToRemove >= matrix.rows()) {
-    return;
-  }
-  unsigned int numRows = matrix.rows() - 1;
-  unsigned int numCols = matrix.cols();
-
-  if (rowToRemove < numRows) {
-    matrix.block(rowToRemove, 0, numRows - rowToRemove, numCols) =
-        matrix.bottomRows(numRows - rowToRemove);
-  }
-
-  matrix.conservativeResize(numRows, numCols);
-}
-
-/**
- * Remove one column from matrix.
- * Credit to: https://stackoverflow.com/questions/13290395
- * @param matrix
- * @param colToRemove index of col to remove. If >= matrix.cols(), no operation will be taken
- */
-template <class T, int R, int C>
-void removeColumn(Eigen::Matrix<T, R, C>& matrix, unsigned int colToRemove) {
-  if (colToRemove >= matrix.cols()) {
-    return;
-  }
-  unsigned int numRows = matrix.rows();
-  unsigned int numCols = matrix.cols() - 1;
-
-  if (colToRemove < numCols) {
-    matrix.block(0, colToRemove, numRows, numCols - colToRemove) =
-        matrix.rightCols(numCols - colToRemove);
-  }
-
-  matrix.conservativeResize(numRows, numCols);
-}
-
-#endif
+#endif  // ROLO_UTILS_PARAM_LOADER_HPP_

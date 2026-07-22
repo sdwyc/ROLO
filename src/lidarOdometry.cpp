@@ -1,4 +1,4 @@
-#include "rolo/utility.h"
+#include "utility.hpp"
 #include "rolo/eskf/eskf.hpp"
 #include "autoware_rviz_msgs/Path.h"
 #include "autoware_rviz_msgs/PathPoint.h"
@@ -25,24 +25,9 @@
 #include <pcl/common/transforms.h>
 #include <pcl/filters/approximate_voxel_grid.h>
 
-#include <pcl/registration/ndt.h>
-#include <pcl/registration/gicp.h>
-#include <rot_gicp/gicp/rot_vgicp.hpp>
+#include "rolo/registration.hpp"
 
 using namespace Eigen;
-
-//! Convert odometry to transform matrix
-Eigen::Affine3f odom2affine(nav_msgs::Odometry odom) // Affine transform from rotation and translation
-{
-    double x, y, z, roll, pitch, yaw;
-    x = odom.pose.pose.position.x;
-    y = odom.pose.pose.position.y;
-    z = odom.pose.pose.position.z;
-    tf::Quaternion orientation;
-    tf::quaternionMsgToTF(odom.pose.pose.orientation, orientation);
-    tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
-    return pcl::getTransformation(x, y, z, roll, pitch, yaw);
-}
 
 class TransformFusion : public ParamLoader
 {
@@ -122,16 +107,6 @@ public:
 
         lidarOdomQueue.push_back(*odomMsg);
         latestLidarOdomTemplate = *odomMsg;
-    }
-
-    bool affineToPose(const Eigen::Affine3f& affine, Eigen::Vector3d& position, Eigen::Quaterniond& orientation)
-    {
-        position = affine.translation().cast<double>();
-        Eigen::Matrix3d rotation = affine.rotation().cast<double>();
-
-        orientation = Eigen::Quaterniond(rotation);
-        orientation.normalize();
-        return true;
     }
 
     void fusionTimerHandler(const ros::TimerEvent& event)
@@ -460,16 +435,16 @@ public:
         feature_rotated->clear();
         // Translate-interpolate for center alignment
         pcl::transformPointCloud(*featureOld, *feature_propagated, transformation_interpolated);
-        fast_gicp::RotVGICP<PointType, PointType> rot_vgicp;
-        // rot_vgicp.setResolution(1.0);
-        rot_vgicp.setPolarResolution(0.175, 0.175, 2.0);
-        rot_vgicp.setNumThreads(omp_get_max_threads());
-        rot_vgicp.clearTarget();
-        rot_vgicp.clearSource();
-        rot_vgicp.setInputTarget(featureLast);
-        rot_vgicp.setInputSource(feature_propagated);
-        rot_vgicp.align(*aligned);
-        Eigen::Matrix4f trans = rot_vgicp.getFinalTransformation(); // Rotation estimate
+        rolo::SVGICP<PointType, PointType> svgicp;
+        // svgicp.setResolution(1.0);
+        svgicp.setPolarResolution(0.175, 0.175, 2.0);
+        svgicp.setNumThreads(omp_get_max_threads());
+        svgicp.clearTarget();
+        svgicp.clearSource();
+        svgicp.setInputTarget(featureLast);
+        svgicp.setInputSource(feature_propagated);
+        svgicp.align(*aligned);
+        Eigen::Matrix4f trans = svgicp.getFinalTransformation(); // Rotation estimate
         // Rotation = trans.block<3, 3>(0, 0).cast<float>() * Rotation.eval();
         Eigen::Affine3f transformStep;
         transformStep.matrix() = trans.cast<float>();
@@ -494,7 +469,7 @@ public:
         aligned->clear();
         pcl::transformPointCloud(*featureOld, *feature_rotated, transformation_interpolated);
         Eigen::Vector3d Reg_translation = Eigen::Vector3d::Zero();
-        rot_vgicp.computeTranslation(*aligned, Reg_translation, Translation, TranslationOld, 0.1, 0.1, CT_lambda);
+        svgicp.computeTranslation(*aligned, Reg_translation, Translation, TranslationOld, 0.1, 0.1, CT_lambda);
         // std::cout << "Reg_translation: " << Reg_translation.transpose() << std::endl;
         auto t_end = std::chrono::system_clock::now();
         std::chrono::duration<double> t_elapsed_seconds = t_end - r_end;

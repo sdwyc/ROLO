@@ -107,37 +107,15 @@ link_directories(
   ${OpenCV_LIBRARY_DIRS}
   ${GTSAM_LIBRARY_DIRS}
 )
-# Add icp lib
-add_library(rot_gicp SHARED
-  src/rot_gicp/gicp/lsq_registration.cpp
-  src/rot_gicp/gicp/rot_vgicp.cpp
-)
-target_link_libraries(rot_gicp
-  ${PCL_LIBRARIES}
-)
-if (OPENMP_FOUND)
-    if (TARGET OpenMP::OpenMP_CXX)
-        target_link_libraries(rot_gicp OpenMP::OpenMP_CXX)
-    endif ()
-endif ()
-target_include_directories(rot_gicp PUBLIC
-  include
-  ${PCL_INCLUDE_DIRS}
-  ${EIGEN3_INCLUDE_DIR}
-)
 
-add_executable(${PROJECT_NAME}_imageProjection src/imageProjection.cpp)
-add_dependencies(${PROJECT_NAME}_imageProjection ${PROJECT_NAME}_generate_messages_cpp)
-target_link_libraries(${PROJECT_NAME}_imageProjection ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
-
-add_executable(${PROJECT_NAME}_featureExtraction src/featureExtraction.cpp)
-add_dependencies(${PROJECT_NAME}_featureExtraction ${PROJECT_NAME}_generate_messages_cpp)
-target_link_libraries(${PROJECT_NAME}_featureExtraction ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
+add_executable(${PROJECT_NAME}_scanPreprocess src/scanPreprocess.cpp)
+add_dependencies(${PROJECT_NAME}_scanPreprocess ${PROJECT_NAME}_generate_messages_cpp)
+target_link_libraries(${PROJECT_NAME}_scanPreprocess ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_executable(${PROJECT_NAME}_lidarOdometry src/lidarOdometry.cpp)
-add_dependencies(${PROJECT_NAME}_lidarOdometry ${PROJECT_NAME}_generate_messages_cpp rot_gicp)
+add_dependencies(${PROJECT_NAME}_lidarOdometry ${PROJECT_NAME}_generate_messages_cpp)
 target_compile_options(${PROJECT_NAME}_lidarOdometry PRIVATE ${OpenMP_CXX_FLAGS})
-target_link_libraries(${PROJECT_NAME}_lidarOdometry ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam rot_gicp)
+target_link_libraries(${PROJECT_NAME}_lidarOdometry ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam)
 
 add_executable(${PROJECT_NAME}_backMapping
   src/backMapping.cpp
