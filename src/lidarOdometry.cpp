@@ -314,11 +314,14 @@ private:
     Affine3f lastOdomAffine; // Previous odometry affine
     Affine3f lidarMappingAffine; // Transform between adjacent odometry frames
     Affine3f transformation_interpolated;
+    Affine3d imuToLidarAffine;
+    Affine3d lidarToImuAffine;
 
     std::chrono::_V2::system_clock::time_point start_time;
 
     // ROS wrraper
     ros::Subscriber subCloudInfo;
+    ros::Subscriber subImu;
     // TODO: receive backend optimized pose
     ros::Subscriber subOdometryMapped;
     ros::Publisher pubFrontCloudInfo;
@@ -352,6 +355,15 @@ private:
     pcl::PointCloud<PointType>::Ptr featureOld;
 
     std::queue<rolo::CloudInfoStamp> laserCloudInfoBuf;
+
+    std::mutex imuMtx;
+    bool imuIntegrationStarted = false;
+    bool imuDeltaAvailable = false;
+    double imuWindowStartTime = -1.0;
+    double imuLastTime = -1.0;
+    Quaterniond imuDeltaRot = Quaterniond::Identity(); // current IMU frame w.r.t. scan start
+    Vector3d imuDeltaVel = Vector3d::Zero();
+    Vector3d imuDeltaPos = Vector3d::Zero();
     
     Matrix3d Rotation;
     Vector3d Translation;
@@ -374,6 +386,8 @@ public:
         subOdometryMapped = nh.subscribe<nav_msgs::Odometry>("rolo/mapping/odometry", 10, &LidarOdometry::odometryHandler, this, ros::TransportHints().tcpNoDelay());
         // Subscribe to feature cloud info
         subCloudInfo = nh.subscribe<rolo::CloudInfoStamp>("rolo/feature/cloud_info", 10, &LidarOdometry::cloudHandler, this, ros::TransportHints().tcpNoDelay());
+        if (imuEnable)
+            subImu = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &LidarOdometry::imuHandler, this, ros::TransportHints().tcpNoDelay());
         // Publish predicted front-end odometry
         pubFrontCloudInfo = nh.advertise<rolo::CloudInfoStamp>(odomTopic+"/cloud_info", 2000);
         pubLidarOdometry = nh.advertise<nav_msgs::Odometry> (odomTopic+"_incremental", 2000);
@@ -392,6 +406,10 @@ public:
         lidarMappingAffine = Affine3f::Identity();
         lastOdomAffine = Affine3f::Identity();
         transformation_interpolated = Affine3f::Identity();
+        imuToLidarAffine = Affine3d::Identity();
+        imuToLidarAffine.linear() = imuToLidarRot;
+        imuToLidarAffine.translation() = imuToLidarTrans;
+        lidarToImuAffine = imuToLidarAffine.inverse();
         lastOdomTime = -1;
         RegCloud.reset(new pcl::PointCloud<PointType>());
         lastMappingInterval = 9999.0;
@@ -421,6 +439,82 @@ public:
         nav_msgs::Odometry mappedOdom_ = *mappedOdom;
         lastOdomTime = currentCorrectionTime;
         doneBackOpt = true;
+    }
+
+    void resetImuIntegration(double scanStartTime)
+    {
+        std::lock_guard<std::mutex> lock(imuMtx);
+        imuIntegrationStarted = true;
+        imuDeltaAvailable = false;
+        imuWindowStartTime = scanStartTime;
+        imuLastTime = scanStartTime;
+        imuDeltaRot = Quaterniond::Identity();
+        imuDeltaVel.setZero();
+        imuDeltaPos.setZero();
+    }
+
+    Vector3d gravityCompensatedAcc(const sensor_msgs::Imu& imuMsg)
+    {
+        Vector3d acc(imuMsg.linear_acceleration.x,
+                     imuMsg.linear_acceleration.y,
+                     imuMsg.linear_acceleration.z);
+        Quaterniond qWorldImu(imuMsg.orientation.w,
+                              imuMsg.orientation.x,
+                              imuMsg.orientation.y,
+                              imuMsg.orientation.z);
+        if (imuMsg.orientation_covariance[0] == -1 || qWorldImu.norm() < 0.1)
+            return Vector3d::Zero();
+
+        qWorldImu.normalize();
+        const Vector3d gravityWorld(0.0, 0.0, 9.81);
+        return acc - qWorldImu.inverse() * gravityWorld;
+    }
+
+    void imuHandler(const sensor_msgs::ImuConstPtr& imuMsg)
+    {
+        std::lock_guard<std::mutex> lock(imuMtx);
+        if (!imuIntegrationStarted)
+            return;
+
+        double imuTime = imuMsg->header.stamp.toSec();
+        if (imuTime <= imuWindowStartTime || imuTime <= imuLastTime)
+            return;
+
+        double dt = imuTime - imuLastTime;
+        if (!std::isfinite(dt) || dt <= 0.0 || dt > 1.0)
+        {
+            imuLastTime = imuTime;
+            return;
+        }
+
+        Vector3d gyr(imuMsg->angular_velocity.x,
+                     imuMsg->angular_velocity.y,
+                     imuMsg->angular_velocity.z);
+        Vector3d deltaAngle = gyr * dt;
+        double angle = deltaAngle.norm();
+        if (angle > 1e-12)
+            imuDeltaRot = (imuDeltaRot * Quaterniond(AngleAxisd(angle, deltaAngle / angle))).normalized();
+
+        Vector3d accStart = imuDeltaRot * gravityCompensatedAcc(*imuMsg);
+        imuDeltaPos += imuDeltaVel * dt + 0.5 * accStart * dt * dt;
+        imuDeltaVel += accStart * dt;
+        imuLastTime = imuTime;
+        imuDeltaAvailable = true;
+    }
+
+    bool getImuInitialGuess(double scanEndTime, Affine3f& initialGuess)
+    {
+        std::lock_guard<std::mutex> lock(imuMtx);
+        if (!imuEnable || !imuIntegrationStarted || !imuDeltaAvailable || imuLastTime < scanEndTime - 0.02)
+            return false;
+
+        Affine3d imuStartToCur = Affine3d::Identity();
+        imuStartToCur.linear() = imuDeltaRot.toRotationMatrix();
+        /*  IMU translation integration is not accurate */
+        // imuStartToCur.translation() = imuDeltaPos;
+        Affine3d lidarCurToStart = imuToLidarAffine * imuStartToCur * lidarToImuAffine;
+        initialGuess = lidarCurToStart.cast<float>();
+        return true;
     }
 
     void scanRegeistration(){
@@ -454,15 +548,6 @@ public:
         auto r_end = std::chrono::system_clock::now();
         std::chrono::duration<double> r_elapsed_seconds = r_end - start;
         printf("Rotation Solver Duration: %f ms.\n" ,r_elapsed_seconds.count() * 1000);
-
-        // Eigen::Vector3f rotation_euler;
-        // float x, y, z;
-        // pcl::getTranslationAndEulerAngles<float>(transformStep, 
-        //                                             x, y, z,
-        //                                             rotation_euler[0],
-        //                                             rotation_euler[1], 
-        //                                             rotation_euler[2]); 
-        // std::cout << "rotation angles: " << std::endl << rotation_euler*180/M_PI << std::endl;
 
         // Translation registration
         // Apply rotation first
@@ -504,12 +589,20 @@ public:
 
         if(isFirstFrame){
             isFirstFrame = false;
+            cloudTimeLast = cloudTimeCur;
             *FullCloudOld = *FullCloudLast;
             *CloudCornerOld = *CloudCornerLast;
             *CloudSurfOld = *CloudSurfLast;
             *featureOld = *featureLast;
+            if (imuEnable)
+                resetImuIntegration(cloudTimeCur);
             return;
         }
+
+        Affine3f imuInitialGuess = Affine3f::Identity();
+        bool hasImuInitialGuess = getImuInitialGuess(cloudTimeCur, imuInitialGuess);
+        if (imuEnable)
+            resetImuIntegration(cloudTimeCur);
 
         // Check first global optimization
         // if (doneFirstOpt == false)
@@ -522,8 +615,12 @@ public:
         // Forward-propagate state.
         if(lastOdomTime != -1.0){   // Only after initialization
             double latestInterval = cloudTimeCur - cloudTimeLast;
-            
-            stateLinearPropagation(lidarMappingAffine, lastMappingInterval, latestInterval, transformation_interpolated);
+            if (hasImuInitialGuess){
+                stateLinearPropagation(lidarMappingAffine, lastMappingInterval, latestInterval, transformation_interpolated);
+                transformation_interpolated.linear() = imuInitialGuess.rotation();
+            }
+            else
+                stateLinearPropagation(lidarMappingAffine, lastMappingInterval, latestInterval, transformation_interpolated);
             Rotation = transformation_interpolated.rotation().cast<double>();
             Translation = transformation_interpolated.translation().cast<double>();
             if(Translation.array().maxCoeff() > 5.0){
@@ -700,7 +797,7 @@ int main(int argc, char** argv)
     TransformFusion TF;
     
 
-    ros::MultiThreadedSpinner spinner(2);
+    ros::MultiThreadedSpinner spinner(4);
     spinner.spin();
     // ros::spin();
     

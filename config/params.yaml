@@ -3,6 +3,7 @@ rolo:
   # Topics
   pointCloudTopic: "/velodyne_points"               # Point cloud data
   odomTopic: "odometry/lidar"                   # Front end LiDAR odometry, same frequency as LiDAR pointcloud
+  imuTopic: "/imu/data"                           # IMU data for deskewing and lidar odometry initial guess
 
   # Frames
   lidarFrame: "velodyne"
@@ -23,7 +24,13 @@ rolo:
   lidarMinRange: 2.0                          # default: 1.0, minimum lidar range to be used
   lidarMaxRange: 1000.0                       # default: 1000.0, maximum lidar range to be used
   lidarNoiseBound: 0.05                     # lidar noise follows Guassian distribution, this is convariance
-  deskewEnabled: false                         # Enable flag for laser deskew
+  deskewEnabled: true                         # Enable flag for laser deskew
+  imuEnable: true                              # true: use IMU for deskewing and lidar registration initial guess
+  # IMU -> lidar extrinsic. Missing params default to identity.
+  imuToLidarTrans: [0.0, 0.0, 0.15]
+  imuToLidarRot: [1.0, 0.0, 0.0,
+                  0.0, 1.0, 0.0,
+                  0.0, 0.0, 1.0]
 
   # LOAM feature threshold
   edgeThreshold: 0.8

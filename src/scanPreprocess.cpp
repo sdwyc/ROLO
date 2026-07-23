@@ -15,12 +15,21 @@ struct comp_rule{
 
 const int queueLength = 2000;
 
+struct ProjectedPoint{
+    bool valid = false;
+    int row = -1;
+    int col = -1;
+    float range = 0.0f;
+    PointType point;
+};
+
 class ScanPreprocess : public ParamLoader
 {
 private:
 
     ros::Subscriber subLaserCloud;
     ros::Subscriber subOdom;
+    ros::Subscriber subImu;
 
     ros::Publisher pubFeatureCloudInfo;
     ros::Publisher pubProjectedCloud;
@@ -30,12 +39,13 @@ private:
 
     std::deque<sensor_msgs::PointCloud2> cloudQueue;
     std::deque<nav_msgs::Odometry> odomQueue;
+    std::deque<sensor_msgs::Imu> imuQueue;
     std::mutex odomLock;
+    std::mutex imuLock;
     sensor_msgs::PointCloud2 currentCloudMsg;
 
     pcl::PointCloud<PointXYZIRT>::Ptr laserCloudIn;
     pcl::PointCloud<OusterInputPointType>::Ptr tmpOusterCloudIn;
-    pcl::PointCloud<PointType>::Ptr deskewCloud;
     pcl::PointCloud<PointType>::Ptr fullCloud;
     pcl::PointCloud<PointType>::Ptr extractedCloud;
     pcl::PointCloud<PointType>::Ptr cornerCloud;
@@ -61,6 +71,12 @@ private:
     double odomTimeDiff = -1.0;
     float odomIncreX, odomIncreY, odomIncreZ, odomIncreRoll, odomIncrePitch, odomIncreYaw;
     bool odomAvailable = false;
+    bool imuAvailable = false;
+    int imuPointerCur = 0;
+    double imuTime[queueLength];
+    float imuRotX[queueLength];
+    float imuRotY[queueLength];
+    float imuRotZ[queueLength];
     double timeScanCur;
     double timeScanEnd;
 
@@ -69,6 +85,8 @@ public:
     {
         subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(pointCloudTopic, 10, &ScanPreprocess::cloudHandler, this, ros::TransportHints().tcpNoDelay());
         subOdom = nh.subscribe<nav_msgs::Odometry>(odomTopic+"_incremental", 2000, &ScanPreprocess::odometryHandler, this, ros::TransportHints().tcpNoDelay());
+        if (imuEnable)
+            subImu = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ScanPreprocess::imuHandler, this, ros::TransportHints().tcpNoDelay());
 
         pubFeatureCloudInfo = nh.advertise<rolo::CloudInfoStamp> ("rolo/feature/cloud_info", 1);
         pubCornerPoints = nh.advertise<sensor_msgs::PointCloud2>("rolo/feature/cloud_corner", 1);
@@ -91,7 +109,6 @@ public:
     {
         laserCloudIn.reset(new pcl::PointCloud<PointXYZIRT>());
         tmpOusterCloudIn.reset(new pcl::PointCloud<OusterInputPointType>());
-        deskewCloud.reset(new pcl::PointCloud<PointType>());
         fullCloud.reset(new pcl::PointCloud<PointType>());
         extractedCloud.reset(new pcl::PointCloud<PointType>());
         cornerCloud.reset(new pcl::PointCloud<PointType>());
@@ -116,7 +133,6 @@ public:
     void resetParameters()
     {
         laserCloudIn->clear();
-        deskewCloud->clear();
         extractedCloud->clear();
         cornerCloud->clear();
         surfaceCloud->clear();
@@ -136,12 +152,20 @@ public:
             odomAvailable = true;
     }
 
+    void imuHandler(const sensor_msgs::ImuConstPtr& imuMsg)
+    {
+        std::lock_guard<std::mutex> lock(imuLock);
+        imuQueue.push_back(*imuMsg);
+        if (imuQueue.size() > queueLength)
+            imuQueue.pop_front();
+    }
+
     void cloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
     {
         if (!cachePointCloud(laserCloudMsg))
             return;
 
-        if (!deskewCloudInfo())
+        if (!prepareDeskewInfo())
             return;
 
         projectPointCloud();
@@ -193,9 +217,13 @@ public:
             ros::shutdown();
         }
 
+        if (laserCloudIn->empty())
+            return false;
+
         cloudHeader = currentCloudMsg.header;
         timeScanCur = cloudHeader.stamp.toSec();
         timeScanEnd = timeScanCur + laserCloudIn->points.back().time;
+        scanPeriod = std::max(std::abs(laserCloudIn->points.back().time), 0.1f);
 
         if (laserCloudIn->is_dense == false)
         {
@@ -212,7 +240,7 @@ public:
                 if (currentCloudMsg.fields[i].name == "ring")
                 {
                     ringFlag = 1;
-                    ROS_WARN("Point cloud ring field available!");
+                    ROS_INFO("Point cloud ring field available!\n");
                     break;
                 }
             }
@@ -226,32 +254,41 @@ public:
                 if (currentCloudMsg.fields[i].name == timeField)
                 {
                     timeFlag = 1;
-                    ROS_WARN("Point cloud time field available!");
+                    ROS_INFO("Point cloud time field available!\n");
                     break;
                 }
             }
+            if (timeFlag == -1)
+            {
+                deskewEnabled = false;
+                ROS_WARN("Point cloud time field not available, disable point deskewing.\n");
+            }
         }
+
+        scanPeriod = std::max(std::abs(laserCloudIn->points.back().time), 0.1f);
+        timeScanEnd = timeScanCur + scanPeriod;
         return true;
     }
 
-    bool deskewCloudInfo()
+    bool prepareDeskewInfo()
     {
-        if (!deskewEnabled || !odomAvailable)
+        imuAvailable = false;
+        odomTimeDiff = -1.0;
+        if (!deskewEnabled)
             return true;
 
-        int cloudSize = laserCloudIn->points.size();
+        if (imuEnable)
+            return imuDeskewInfo();
+
+        return odomDeskewInfo();
+    }
+
+    bool odomDeskewInfo()
+    {
+        if (!odomAvailable)
+            return true;
+
         std::lock_guard<std::mutex> lock(odomLock);
-        if (odomQueue.size() < 2)
-            return true;
-
-        float startOri = -atan2(laserCloudIn->points[0].y, laserCloudIn->points[0].x);
-        float endOri   = -atan2(laserCloudIn->points[cloudSize - 1].y, laserCloudIn->points[cloudSize - 1].x) + 2 * M_PI;
-        if (endOri - startOri > 3 * M_PI)
-            endOri -= 2 * M_PI;
-        else if (endOri - startOri < M_PI)
-            endOri += 2 * M_PI;
-        float orientationDiff = endOri - startOri;
-
         while (!odomQueue.empty())
         {
             double maxDiff = timeFlag == -1 ? 0.25 : 0.3;
@@ -269,70 +306,137 @@ public:
         odomTimeDiff = odomQueue.back().header.stamp.toSec() - odomQueue.front().header.stamp.toSec();
         if (odomTimeDiff <= 0)
             return true;
-        pcl::getTranslationAndEulerAngles(lidarOdomAffineIncre, odomIncreX, odomIncreY, odomIncreZ, odomIncreRoll, odomIncrePitch, odomIncreYaw);
 
-        bool halfPassed = false;
-        PointType point;
-        deskewCloud->points.resize(cloudSize);
-        for (int i = 0; i < cloudSize; i++)
-        {
-            point.x = laserCloudIn->points[i].y;
-            point.y = laserCloudIn->points[i].z;
-            point.z = laserCloudIn->points[i].x;
-#if HasRGB
-            point.rgb = laserCloudIn->points[i].rgb;
-#endif
-
-            if (timeFlag == -1)
-            {
-                float ori = -atan2(point.x, point.z);
-                if (!halfPassed)
-                {
-                    if (ori < startOri - M_PI / 2)
-                        ori += 2 * M_PI;
-                    else if (ori > startOri + M_PI * 3 / 2)
-                        ori -= 2 * M_PI;
-
-                    if (ori - startOri > M_PI)
-                        halfPassed = true;
-                }
-                else
-                {
-                    ori += 2 * M_PI;
-                    if (ori < endOri - M_PI * 3 / 2)
-                        ori += 2 * M_PI;
-                    else if (ori > endOri + M_PI / 2)
-                        ori -= 2 * M_PI;
-                }
-                point.intensity = scanPeriod * (ori - startOri) / orientationDiff;
-            }
-            else
-            {
-                point.intensity = fabs(laserCloudIn->points[i].time);
-            }
-            deskewCloud->points[i] = point;
-        }
+        pcl::getTranslationAndEulerAngles(lidarOdomAffineIncre, odomIncreX, odomIncreY, odomIncreZ,
+                                          odomIncreRoll, odomIncrePitch, odomIncreYaw);
         return true;
     }
 
-    PointType deskewPoint(PointType *point, double relTime)
+    bool imuDeskewInfo()
     {
-        if (!deskewEnabled || !odomAvailable || odomTimeDiff <= 0)
-            return *point;
+        std::lock_guard<std::mutex> lock(imuLock);
+        if (imuQueue.empty())
+        {
+            ROS_WARN_THROTTLE(1.0, "IMU deskew enabled, but IMU queue is empty.");
+            return false;
+        }
 
-        float ratio = relTime / scanPeriod;
-        Eigen::Matrix<float, 6, 1> trans;
-        trans.col(0) << odomIncreX, odomIncreY, odomIncreZ, odomIncreRoll, odomIncrePitch, odomIncreYaw;
-        trans = trans.eval() * (scanPeriod / odomTimeDiff) * ratio;
-        Eigen::Affine3f transBt = pcl::getTransformation(0.0, 0.0, 0.0, -trans(3), -trans(4), -trans(5));
+        while (!imuQueue.empty() && imuQueue.front().header.stamp.toSec() < timeScanCur - 0.01)
+            imuQueue.pop_front();
+
+        if (imuQueue.empty() ||
+            imuQueue.front().header.stamp.toSec() > timeScanCur ||
+            imuQueue.back().header.stamp.toSec() < timeScanEnd)
+        {
+            ROS_WARN_THROTTLE(1.0, "IMU data does not cover current scan, skip this cloud.");
+            return false;
+        }
+
+        imuPointerCur = 0;
+        for (size_t i = 0; i < imuQueue.size(); ++i)
+        {
+            sensor_msgs::Imu thisImu = imuQueue[i];
+            double currentImuTime = thisImu.header.stamp.toSec();
+            if (currentImuTime > timeScanEnd + 0.01)
+                break;
+
+            if (imuPointerCur == 0)
+            {
+                imuRotX[0] = 0;
+                imuRotY[0] = 0;
+                imuRotZ[0] = 0;
+                imuTime[0] = currentImuTime;
+                ++imuPointerCur;
+                continue;
+            }
+
+            double timeDiff = currentImuTime - imuTime[imuPointerCur - 1];
+            imuRotX[imuPointerCur] = imuRotX[imuPointerCur - 1] + thisImu.angular_velocity.x * timeDiff;
+            imuRotY[imuPointerCur] = imuRotY[imuPointerCur - 1] + thisImu.angular_velocity.y * timeDiff;
+            imuRotZ[imuPointerCur] = imuRotZ[imuPointerCur - 1] + thisImu.angular_velocity.z * timeDiff;
+            imuTime[imuPointerCur] = currentImuTime;
+            ++imuPointerCur;
+            if (imuPointerCur >= queueLength)
+                break;
+        }
+
+        imuAvailable = imuPointerCur > 1;
+        return imuAvailable;
+    }
+
+    void findRotation(double relTime, float *rotXCur, float *rotYCur, float *rotZCur)
+    {
+        *rotXCur = 0;
+        *rotYCur = 0;
+        *rotZCur = 0;
+
+        if (!imuAvailable || imuPointerCur <= 0)
+            return;
+
+        double pointTime = timeScanCur + relTime;
+        int imuPointerFront = 0;
+        while (imuPointerFront < imuPointerCur && imuTime[imuPointerFront] < pointTime)
+            ++imuPointerFront;
+
+        if (imuPointerFront == 0)
+        {
+            *rotXCur = imuRotX[0];
+            *rotYCur = imuRotY[0];
+            *rotZCur = imuRotZ[0];
+            return;
+        }
+
+        if (imuPointerFront >= imuPointerCur)
+        {
+            int last = imuPointerCur - 1;
+            *rotXCur = imuRotX[last];
+            *rotYCur = imuRotY[last];
+            *rotZCur = imuRotZ[last];
+            return;
+        }
+
+        int imuPointerBack = imuPointerFront - 1;
+        double ratioFront = (pointTime - imuTime[imuPointerBack]) / (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
+        double ratioBack = 1.0 - ratioFront;
+        *rotXCur = imuRotX[imuPointerFront] * ratioFront + imuRotX[imuPointerBack] * ratioBack;
+        *rotYCur = imuRotY[imuPointerFront] * ratioFront + imuRotY[imuPointerBack] * ratioBack;
+        *rotZCur = imuRotZ[imuPointerFront] * ratioFront + imuRotZ[imuPointerBack] * ratioBack;
+    }
+
+    PointType deskewPoint(const PointType& point, double relTime)
+    {
+        if (!deskewEnabled)
+            return point;
+
+        Eigen::Affine3f transBt = Eigen::Affine3f::Identity();
+        if (imuEnable)
+        {
+            if (!imuAvailable)
+                return point;
+
+            float rotXCur, rotYCur, rotZCur;
+            findRotation(relTime, &rotXCur, &rotYCur, &rotZCur);
+            transBt = pcl::getTransformation(0.0, 0.0, 0.0, rotXCur, rotYCur, rotZCur);
+        }
+        else
+        {
+            if (!odomAvailable || odomTimeDiff <= 0)
+                return point;
+
+            float ratio = relTime / scanPeriod;
+            Eigen::Matrix<float, 6, 1> trans;
+            trans.col(0) << odomIncreX, odomIncreY, odomIncreZ, odomIncreRoll, odomIncrePitch, odomIncreYaw;
+            trans = trans.eval() * (scanPeriod / odomTimeDiff) * ratio;
+            transBt = pcl::getTransformation(0.0, 0.0, 0.0, -trans(3), -trans(4), -trans(5));
+        }
 
         PointType newPoint;
-        newPoint.x = transBt(0,0) * point->x + transBt(0,1) * point->y + transBt(0,2) * point->z + transBt(0,3);
-        newPoint.y = transBt(1,0) * point->x + transBt(1,1) * point->y + transBt(1,2) * point->z + transBt(1,3);
-        newPoint.z = transBt(2,0) * point->x + transBt(2,1) * point->y + transBt(2,2) * point->z + transBt(2,3);
-        newPoint.intensity = point->intensity;
+        newPoint.x = transBt(0,0) * point.x + transBt(0,1) * point.y + transBt(0,2) * point.z + transBt(0,3);
+        newPoint.y = transBt(1,0) * point.x + transBt(1,1) * point.y + transBt(1,2) * point.z + transBt(1,3);
+        newPoint.z = transBt(2,0) * point.x + transBt(2,1) * point.y + transBt(2,2) * point.z + transBt(2,3);
+        newPoint.intensity = point.intensity;
 #if HasRGB
-        newPoint.rgb = point->rgb;
+        newPoint.rgb = point.rgb;
 #endif
         return newPoint;
     }
@@ -340,6 +444,9 @@ public:
     void projectPointCloud()
     {
         int cloudSize = laserCloudIn->points.size();
+        std::vector<ProjectedPoint> projected(cloudSize);
+
+        #pragma omp parallel for num_threads(numberOfCores)
         for (int i = 0; i < cloudSize; ++i)
         {
             PointType thisPoint;
@@ -350,6 +457,9 @@ public:
 #if HasRGB
             thisPoint.rgb = laserCloudIn->points[i].rgb;
 #endif
+
+            float relTime = fabs(laserCloudIn->points[i].time);
+            thisPoint = deskewPoint(thisPoint, relTime);
 
             float range = pointDistance(thisPoint);
             if (range < lidarMinRange || range > lidarMaxRange)
@@ -375,15 +485,25 @@ public:
             if (columnIdn < 0 || columnIdn >= Horizon_SCAN)
                 continue;
 
+            projected[i].valid = true;
+            projected[i].row = rowIdn;
+            projected[i].col = columnIdn;
+            projected[i].range = range;
+            projected[i].point = thisPoint;
+        }
+
+        for (int i = 0; i < cloudSize; ++i)
+        {
+            if (!projected[i].valid)
+                continue;
+
+            int rowIdn = projected[i].row;
+            int columnIdn = projected[i].col;
             if (rangeMat.at<float>(rowIdn, columnIdn) != FLT_MAX)
                 continue;
 
-            if (deskewEnabled && odomAvailable && !deskewCloud->empty())
-                thisPoint = deskewPoint(&thisPoint, deskewCloud->points[i].intensity);
-
-            rangeMat.at<float>(rowIdn, columnIdn) = range;
-            int index = columnIdn + rowIdn * Horizon_SCAN;
-            fullCloud->points[index] = thisPoint;
+            rangeMat.at<float>(rowIdn, columnIdn) = projected[i].range;
+            fullCloud->points[columnIdn + rowIdn * Horizon_SCAN] = projected[i].point;
         }
     }
 

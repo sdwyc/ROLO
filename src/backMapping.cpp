@@ -8,8 +8,6 @@
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/slam/PriorFactor.h>
 #include <gtsam/slam/BetweenFactor.h>
-#include <gtsam/navigation/ImuFactor.h>
-#include <gtsam/navigation/CombinedImuFactor.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
 #include <gtsam/nonlinear/Marginals.h>
@@ -391,7 +389,7 @@ public:
             extractSurroundingKeyFrames();
             // Downsample current features
             downsampleCurrentScan();
-            // IMU data
+            // Scan-to-submap registration
             scan2MapOptimization();
             // Optimize pose with feature constraints
             saveKeyFramesAndFactor();
@@ -460,18 +458,13 @@ public:
         mtx.unlock();
     }
 
-    //! IMU data
     void updateInitialGuess(){
         // save current transformation before any processing
     //! Initial pose from odometry fusion
         incrementalOdometryAffineFront = trans2Affine3f(transformTobeMapped);
 
-        // IMU data
-        // initialization
-        // Format conversion
         if (cloudKeyPoses3D->points.empty())
         {
-        // static Eigen::Affine3f lastOdomTransformation; // Previous IMU-inferred pose cache
             transformTobeMapped[3] = initPose[0];
             transformTobeMapped[4] = initPose[1];
             transformTobeMapped[5] = initPose[2];
@@ -483,8 +476,8 @@ public:
         }
 
         // use LiDAR odometry estimation for pose guess
-        static bool lastOdomTransAvailable = false; // Use IMU preintegration flag
-        static Eigen::Affine3f lastOdomTransformation; // Use IMU preintegration flag
+        static bool lastOdomTransAvailable = false; 
+        static Eigen::Affine3f lastOdomTransformation;
         if (cloudInfo.odomAvailable == true)    // Odometry pose available
         {   // Odometry available branch
             Eigen::Affine3f transBack = pcl::getTransformation(cloudInfo.initialGuessX,    cloudInfo.initialGuessY,     cloudInfo.initialGuessZ, 
@@ -629,7 +622,7 @@ public:
         laserCloudSurfLastDSNum = laserCloudSurfLastDS->size();
     }    
 
-    //! IMU data
+    //! Scan-to-submap registration
     void scan2MapOptimization()
     {
     //! Optimize pose with feature constraints
@@ -655,7 +648,7 @@ public:
                 if (LMOptimization(iterCount) == true)
                     break;              
             }
-            // Fuse IMU data
+
             transformUpdate();
         } else {
             ROS_WARN("Not enough features! Only %d edge and %d planar features available.", laserCloudCornerLastDSNum, laserCloudSurfLastDSNum);
@@ -1008,7 +1001,6 @@ public:
         return false; // keep optimizing
     }
 
-    //! IMU data
     void transformUpdate()
     {
     //! Optimize pose with feature constraints

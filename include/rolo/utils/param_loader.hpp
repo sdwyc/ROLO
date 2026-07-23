@@ -13,6 +13,7 @@
 #include <vector>
 
 #include <Eigen/Dense>
+#include <pcl/console/print.h>
 #include <ros/ros.h>
 #include <unistd.h>
 
@@ -70,11 +71,10 @@ public:
 
     ros::NodeHandle nh;
 
-    std::string robot_id;
-
     // Topics
     std::string pointCloudTopic;
     std::string odomTopic;
+    std::string imuTopic;
 
     // Frames
     std::string lidarFrame;
@@ -96,6 +96,9 @@ public:
     float lidarMaxRange;
     float lidarNoiseBound;
     bool deskewEnabled;
+    bool imuEnable;
+    Eigen::Vector3d imuToLidarTrans;
+    Eigen::Matrix3d imuToLidarRot;
 
     // LOAM
     float edgeThreshold;
@@ -189,10 +192,11 @@ public:
 
     ParamLoader(bool requireSensorConfig = true)
     {
-        nh.param<std::string>("/robot_id", robot_id, "roboat");
+        pcl::console::setVerbosityLevel(pcl::console::L_ERROR);
 
         nh.param<std::string>("rolo/pointCloudTopic", pointCloudTopic, "points_raw");
         nh.param<std::string>("rolo/odomTopic", odomTopic, "odometry/imu");
+        nh.param<std::string>("rolo/imuTopic", imuTopic, "imu/data");
 
         nh.param<std::string>("rolo/lidarFrame", lidarFrame, "base_link");
         nh.param<std::string>("rolo/baselinkFrame", baselinkFrame, "base_link");
@@ -235,6 +239,9 @@ public:
         nh.param<float>("rolo/lidarMaxRange", lidarMaxRange, 1000.0);
         nh.param<float>("rolo/lidarNoiseBound", lidarNoiseBound, 0.05);
         nh.param<bool>("rolo/deskewEnabled", deskewEnabled, false);
+        nh.param<bool>("rolo/imuEnable", imuEnable, false);
+        imuToLidarTrans = LoadVector3Param(nh, "rolo/imuToLidarTrans", Eigen::Vector3d::Zero());
+        imuToLidarRot = LoadMatrix3Param(nh, "rolo/imuToLidarRot", Eigen::Matrix3d::Identity());
 
         nh.param<float>("rolo/edgeThreshold", edgeThreshold, 0.1);
         nh.param<float>("rolo/surfThreshold", surfThreshold, 0.1);
