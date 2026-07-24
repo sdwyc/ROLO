@@ -37,6 +37,12 @@ find_package(OpenCV REQUIRED QUIET)
 find_package(GTSAM REQUIRED QUIET)
 find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS timer)
+find_package(glog QUIET)
+if(TARGET glog::glog)
+  set(GLOG_LIBRARIES glog::glog)
+else()
+  find_library(GLOG_LIBRARIES glog REQUIRED)
+endif()
 find_package(OpenMP)
 if (OPENMP_FOUND)
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -110,12 +116,12 @@ link_directories(
 
 add_executable(${PROJECT_NAME}_scanPreprocess src/scanPreprocess.cpp)
 add_dependencies(${PROJECT_NAME}_scanPreprocess ${PROJECT_NAME}_generate_messages_cpp)
-target_link_libraries(${PROJECT_NAME}_scanPreprocess ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
+target_link_libraries(${PROJECT_NAME}_scanPreprocess ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${GLOG_LIBRARIES})
 
 add_executable(${PROJECT_NAME}_lidarOdometry src/lidarOdometry.cpp)
 add_dependencies(${PROJECT_NAME}_lidarOdometry ${PROJECT_NAME}_generate_messages_cpp)
 target_compile_options(${PROJECT_NAME}_lidarOdometry PRIVATE ${OpenMP_CXX_FLAGS})
-target_link_libraries(${PROJECT_NAME}_lidarOdometry ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam)
+target_link_libraries(${PROJECT_NAME}_lidarOdometry ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam ${GLOG_LIBRARIES})
 
 add_executable(${PROJECT_NAME}_backMapping
   src/backMapping.cpp
@@ -124,7 +130,7 @@ add_executable(${PROJECT_NAME}_backMapping
 )
 add_dependencies(${PROJECT_NAME}_backMapping ${PROJECT_NAME}_generate_messages_cpp)
 target_compile_options(${PROJECT_NAME}_backMapping PRIVATE ${OpenMP_CXX_FLAGS})
-target_link_libraries(${PROJECT_NAME}_backMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam)
+target_link_libraries(${PROJECT_NAME}_backMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam ${GLOG_LIBRARIES})
 
 add_executable(prior_pose_node
   src/prior_pose/pose_solver.cpp
@@ -135,7 +141,7 @@ target_compile_options(prior_pose_node PRIVATE ${OpenMP_CXX_FLAGS})
 target_link_libraries(prior_pose_node
   ${catkin_LIBRARIES}
   ${PCL_LIBRARIES}
-  ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam
+  ${OpenMP_CXX_FLAGS} ${EIGEN_LIBRARIES} gtsam ${GLOG_LIBRARIES}
 )
 
 ## Test executable

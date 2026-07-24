@@ -15,6 +15,7 @@ rolo:
   # Export settings
   savePCD: false                              # The enable setting for save global keyframes
   savePCDDirectory: "/results/"               # Save path relative to rolo pkg, starts and ends with "/".
+  debug_mode: false                          # Enable extra debug logs and visualization topics.
 
   # Sensor Settings
   sensor: velodyne                            # lidar sensor type, 'velodyne' or 'ouster' or 'livox'
@@ -25,6 +26,7 @@ rolo:
   lidarMaxRange: 1000.0                       # default: 1000.0, maximum lidar range to be used
   lidarNoiseBound: 0.05                     # lidar noise follows Guassian distribution, this is convariance
   deskewEnabled: true                         # Enable flag for laser deskew
+
   imuEnable: true                              # true: use IMU for deskewing and lidar registration initial guess
   # IMU -> lidar extrinsic. Missing params default to identity.
   imuToLidarTrans: [0.0, 0.0, 0.15]
@@ -54,7 +56,7 @@ rolo:
   mappingProcessInterval: 0.15                  # seconds, regulate mapping frequency
 
   # Scan Reagistration
-  continuousTrajectoryWeight: 0.3
+  continuousTrajectoryWeight: 0.15
 
   # Surrounding map
   surroundingkeyframeAddingDistThreshold: 0.5   # meters, regulate keyframe adding threshold

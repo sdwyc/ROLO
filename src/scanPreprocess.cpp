@@ -89,9 +89,14 @@ public:
             subImu = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ScanPreprocess::imuHandler, this, ros::TransportHints().tcpNoDelay());
 
         pubFeatureCloudInfo = nh.advertise<rolo::CloudInfoStamp> ("rolo/feature/cloud_info", 1);
-        pubCornerPoints = nh.advertise<sensor_msgs::PointCloud2>("rolo/feature/cloud_corner", 1);
-        pubSurfacePoints = nh.advertise<sensor_msgs::PointCloud2>("rolo/feature/cloud_surface", 1);
-        pubNormalPoints = nh.advertise<sensor_msgs::PointCloud2>("rolo/feature/cloud_normal", 1);
+        if (debugMode)
+            pubProjectedCloud = nh.advertise<sensor_msgs::PointCloud2>("rolo/feature/cloud_projected", 1);
+        if (debugMode)
+            pubCornerPoints = nh.advertise<sensor_msgs::PointCloud2>("rolo/feature/cloud_corner", 1);
+        if (debugMode)
+            pubSurfacePoints = nh.advertise<sensor_msgs::PointCloud2>("rolo/feature/cloud_surface", 1);
+        if (debugMode)
+            pubNormalPoints = nh.advertise<sensor_msgs::PointCloud2>("rolo/feature/cloud_normal", 1);
 
         allocateMemory();
         resetParameters();
@@ -240,7 +245,6 @@ public:
                 if (currentCloudMsg.fields[i].name == "ring")
                 {
                     ringFlag = 1;
-                    ROS_INFO("Point cloud ring field available!\n");
                     break;
                 }
             }
@@ -254,7 +258,6 @@ public:
                 if (currentCloudMsg.fields[i].name == timeField)
                 {
                     timeFlag = 1;
-                    ROS_INFO("Point cloud time field available!\n");
                     break;
                 }
             }
@@ -526,7 +529,9 @@ public:
             cloudInfoStamp.endRingIndex[i] = count - 1 - 5;
         }
         cloudInfoStamp.header = cloudHeader;
-        cloudInfoStamp.cloud_projected = publishCloud(pubProjectedCloud, extractedCloud, cloudHeader.stamp, lidarFrame);
+        cloudInfoStamp.cloud_projected = cloudToRosMsg(extractedCloud, cloudHeader.stamp, lidarFrame);
+        if (debugMode)
+            pubProjectedCloud.publish(cloudInfoStamp.cloud_projected);
     }
 
     void calculateSmoothness()
@@ -698,9 +703,16 @@ public:
         featureInfo.pointColInd.clear();
         featureInfo.pointRange.clear();
 
-        featureInfo.extracted_corner = publishCloud(pubCornerPoints, cornerCloud, cloudHeader.stamp, lidarFrame);
-        featureInfo.extracted_surface = publishCloud(pubSurfacePoints, surfaceCloud, cloudHeader.stamp, lidarFrame);
-        featureInfo.extracted_normal = publishCloud(pubNormalPoints, normalCloud, cloudHeader.stamp, lidarFrame);
+        featureInfo.extracted_corner = cloudToRosMsg(cornerCloud, cloudHeader.stamp, lidarFrame);
+        featureInfo.extracted_surface = cloudToRosMsg(surfaceCloud, cloudHeader.stamp, lidarFrame);
+        featureInfo.extracted_normal = cloudToRosMsg(normalCloud, cloudHeader.stamp, lidarFrame);
+
+        if (debugMode)
+            pubCornerPoints.publish(featureInfo.extracted_corner);
+        if (debugMode)
+            pubSurfacePoints.publish(featureInfo.extracted_surface);
+        if (debugMode)
+            pubNormalPoints.publish(featureInfo.extracted_normal);
 
         pubFeatureCloudInfo.publish(featureInfo);
     }
@@ -709,10 +721,11 @@ public:
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "scan_preprocess");
+    initLogging(argv[0]);
 
     ScanPreprocess SP;
 
-    ROS_INFO("\033[1;32m----> Scan Preprocess Started.\033[0m");
+    LOG(INFO) << "----> Scan Preprocess Started.";
 
     ros::MultiThreadedSpinner spinner(3);
     spinner.spin();

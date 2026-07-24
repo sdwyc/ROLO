@@ -82,7 +82,7 @@ public:
         subLidarOdometry   = nh.subscribe<nav_msgs::Odometry>(odomTopic+"_incremental",   2000, &TransformFusion::lidarOdometryHandler,   this, ros::TransportHints().tcpNoDelay());
         // Publish fused odometry
         pubLidarOdometry   = nh.advertise<nav_msgs::Odometry>(odomTopic, 2000);
-        pubLidarPath       = nh.advertise<nav_msgs::Path>("rolo/lidar_odometry/path", 1);
+        pubLidarPath   = nh.advertise<nav_msgs::Path>("rolo/lidar_odometry/path", 1);
         pubLidarSpeed      = nh.advertise<std_msgs::Float32>(odomTopic + "/speed", 2000);
         pubFuturePath      = nh.advertise<autoware_rviz_msgs::Path>("future_path", 1);
         pubFuturePoseLidar = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("future_pose_lidar", 1);
@@ -211,12 +211,9 @@ public:
             // Keep only 1s of front-end path
             while(!lidarPath.poses.empty() && lidarPath.poses.front().header.stamp.toSec() < lidarTime - 1.0)
                 lidarPath.poses.erase(lidarPath.poses.begin());
-            if (pubLidarPath.getNumSubscribers() != 0)
-            {
-                lidarPath.header.stamp = stamp;
-                lidarPath.header.frame_id = odometryFrame;
-                pubLidarPath.publish(lidarPath);
-            }
+            lidarPath.header.stamp = stamp;
+            lidarPath.header.frame_id = odometryFrame;
+            pubLidarPath.publish(lidarPath);
         }
 
         std_msgs::Float32 speed_msg;
@@ -361,6 +358,8 @@ private:
     bool imuDeltaAvailable = false;
     double imuWindowStartTime = -1.0;
     double imuLastTime = -1.0;
+    double lastRotationSolveMs = 0.0;
+    double lastTranslationSolveMs = 0.0;
     Quaterniond imuDeltaRot = Quaterniond::Identity(); // current IMU frame w.r.t. scan start
     Vector3d imuDeltaVel = Vector3d::Zero();
     Vector3d imuDeltaPos = Vector3d::Zero();
@@ -391,8 +390,10 @@ public:
         // Publish predicted front-end odometry
         pubFrontCloudInfo = nh.advertise<rolo::CloudInfoStamp>(odomTopic+"/cloud_info", 2000);
         pubLidarOdometry = nh.advertise<nav_msgs::Odometry> (odomTopic+"_incremental", 2000);
-        pubLidarPose = nh.advertise<geometry_msgs::PoseStamped> (odomTopic+"_incremental/pose", 2000);
-        pubLaserPath = nh.advertise<nav_msgs::Path> (odomTopic+"_incremental/path", 2000);
+        if (debugMode)
+            pubLidarPose = nh.advertise<geometry_msgs::PoseStamped> (odomTopic+"_incremental/pose", 2000);
+        if (debugMode)
+            pubLaserPath = nh.advertise<nav_msgs::Path> (odomTopic+"_incremental/path", 2000);
         pubRegScan = nh.advertise<sensor_msgs::PointCloud2> (odomTopic+"/registration_scan", 10);
         pubPlotData = nh.advertise<std_msgs::Float64MultiArray> ("rolo/data_test", 10);
         Init();
@@ -512,13 +513,14 @@ public:
         imuStartToCur.linear() = imuDeltaRot.toRotationMatrix();
         /*  IMU translation integration is not accurate */
         // imuStartToCur.translation() = imuDeltaPos;
-        Affine3d lidarCurToStart = imuToLidarAffine * imuStartToCur * lidarToImuAffine;
+        Affine3d lidarCurToStart = imuToLidarAffine * imuStartToCur.inverse() * lidarToImuAffine;
+        // Affine3d lidarCurToStart = imuToLidarAffine * imuStartToCur * lidarToImuAffine;
         initialGuess = lidarCurToStart.cast<float>();
         return true;
     }
 
     void scanRegeistration(){
-        auto start = std::chrono::system_clock::now();
+        auto start = std::chrono::steady_clock::now();
         // std::chrono::duration<double> elapsed_seconds = end - start;
         // printf("Solver Duration: %f ms.\n" ,elapsed_seconds.count() * 1000);
 
@@ -545,9 +547,8 @@ public:
         transformation_interpolated = transformation_interpolated * transformStep;
         Rotation = transformation_interpolated.rotation().cast<double>();
         Translation = transformation_interpolated.translation().cast<double>();
-        auto r_end = std::chrono::system_clock::now();
-        std::chrono::duration<double> r_elapsed_seconds = r_end - start;
-        printf("Rotation Solver Duration: %f ms.\n" ,r_elapsed_seconds.count() * 1000);
+        auto r_end = std::chrono::steady_clock::now();
+        lastRotationSolveMs = elapsedMillis(start, r_end);
 
         // Translation registration
         // Apply rotation first
@@ -555,10 +556,9 @@ public:
         pcl::transformPointCloud(*featureOld, *feature_rotated, transformation_interpolated);
         Eigen::Vector3d Reg_translation = Eigen::Vector3d::Zero();
         svgicp.computeTranslation(*aligned, Reg_translation, Translation, TranslationOld, 0.1, 0.1, CT_lambda);
-        // std::cout << "Reg_translation: " << Reg_translation.transpose() << std::endl;
-        auto t_end = std::chrono::system_clock::now();
-        std::chrono::duration<double> t_elapsed_seconds = t_end - r_end;
-        printf("Translation Solver Duration: %f ms.\n" ,t_elapsed_seconds.count() * 1000);
+
+        auto t_end = std::chrono::steady_clock::now();
+        lastTranslationSolveMs = elapsedMillis(r_end, t_end);
 
         Translation += Reg_translation;
     }
@@ -623,15 +623,24 @@ public:
                 stateLinearPropagation(lidarMappingAffine, lastMappingInterval, latestInterval, transformation_interpolated);
             Rotation = transformation_interpolated.rotation().cast<double>();
             Translation = transformation_interpolated.translation().cast<double>();
-            if(Translation.array().maxCoeff() > 5.0){
-                std::cout << "Translation: \n" << Translation << std::endl;
-            }
             doneBackOpt = false;
             cloudTimeLast = cloudTimeCur; // Interpolate adjacent frames only
             lastMappingInterval = latestInterval;
         }
 
         scanRegeistration();
+        const Eigen::Vector3d solvedEuler = Rotation.transpose().eulerAngles(0, 1, 2) * 180.0 / M_PI;
+        LOG(INFO) << ROLO_COLOR_FRONTEND
+                    << "\n========== Frontend Lidar Odometry =========="
+                    << "\nimu_enable: " << (imuEnable ? "true" : "false")
+                    << "\nSolving rotation : " << lastRotationSolveMs << " (ms)"
+                    << "\nSolving translation : " << lastTranslationSolveMs << " (ms)"
+                    << "\nSolved Rotation (deg): " << std::fixed << std::setprecision(6)
+                    << "[" << solvedEuler.x() << ", " << solvedEuler.y() << ", " << solvedEuler.z() << "]"
+                    << "\nSolved Translation (m): " << std::fixed << std::setprecision(6)
+                    << "[" << -Translation.x() << ", " << -Translation.y() << ", " << -Translation.z() << "]" 
+                    << "\n============================================="
+                    << ROLO_COLOR_RESET;
 
         updateTransform();
         if(!failureFrameFlag){
@@ -640,7 +649,7 @@ public:
             pubTranform();
         }
         else{
-            printf(" Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n Failure Transformation! Resetting! \n "); 
+            LOG(WARNING) << ROLO_COLOR_FRONTEND << "[lidarOdometry] failure transformation, resetting." << ROLO_COLOR_RESET;
             failureFrameFlag = false;
         }
     }
@@ -742,15 +751,16 @@ public:
         laser_pose.pose.orientation.y = q.y();
         laser_pose.pose.orientation.z = q.z();
         laser_pose.pose.orientation.w = q.w();        
-        pubLidarPose.publish(laser_pose);
+        if (debugMode)
+            pubLidarPose.publish(laser_pose);
 
-        // Publish path
         laser_odom_path.header.frame_id = odometryFrame;
         laser_odom_path.header.stamp = cloudTimeStamp;
         laser_odom_path.poses.push_back(laser_pose);
         nav_msgs::Path laser_odom_path2 = laser_odom_path;
         std::reverse(laser_odom_path2.poses.begin(), laser_odom_path2.poses.end());
-        pubLaserPath.publish(laser_odom_path2);
+        if (debugMode)
+            pubLaserPath.publish(laser_odom_path2);
 
         // Publish incremental odometry
         laser_odom_incremental.header.frame_id = odometryFrame;
@@ -791,8 +801,9 @@ public:
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "rolo");
+    initLogging(argv[0]);
     
-    ROS_INFO("\033[1;32m----> Laser Odometry Started.\033[0m");
+    LOG(INFO) << ROLO_COLOR_FRONTEND << "----> Laser Odometry Started." << ROLO_COLOR_RESET;
     LidarOdometry LO;
     TransformFusion TF;
     

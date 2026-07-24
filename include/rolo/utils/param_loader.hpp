@@ -86,6 +86,7 @@ public:
     // Save pcd
     bool savePCD;
     std::string savePCDDirectory;
+    bool debugMode;
 
     // Lidar Sensor Configuration
     lidarType sensor;
@@ -208,6 +209,7 @@ public:
 
         nh.param<bool>("rolo/savePCD", savePCD, false);
         nh.param<std::string>("rolo/savePCDDirectory", savePCDDirectory, "/Downloads/LOAM/");
+        nh.param<bool>("rolo/debug_mode", debugMode, false);
 
         std::string sensorStr;
         nh.param<std::string>("rolo/sensor", sensorStr, requireSensorConfig ? "" : "velodyne");

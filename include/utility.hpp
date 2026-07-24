@@ -6,6 +6,7 @@
 #include "rolo/CloudInfoStamp.h"
 
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cfloat>
 #include <ctime>
@@ -22,6 +23,7 @@
 #include <thread>
 #include <vector>
 
+#include <glog/logging.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Rot3.h>
@@ -49,21 +51,48 @@
 
 using namespace std;
 
-inline const bool pcl_console_verbosity_configured = []() {
-    pcl::console::setVerbosityLevel(pcl::console::L_ERROR);
-    return true;
-}();
+inline constexpr const char* ROLO_COLOR_FRONTEND = "\033[1;33m";
+inline constexpr const char* ROLO_COLOR_BACKEND = "\033[1;36m";
+inline constexpr const char* ROLO_COLOR_GREEN = "\033[1;32m";
+inline constexpr const char* ROLO_COLOR_RESET = "\033[0m";
+
+inline void initLogging(const char* program)
+{
+    google::InitGoogleLogging(program);
+    FLAGS_logtostderr = true;
+    FLAGS_colorlogtostderr = false;
+}
+
+template <typename ClockTime>
+double elapsedMillis(const ClockTime& start, const ClockTime& end)
+{
+    return std::chrono::duration<double, std::milli>(end - start).count();
+}
+
+inline std::string formatVector3d(const Eigen::Vector3d& vector, int precision = 6)
+{
+    std::ostringstream stream;
+    stream << std::fixed << std::setprecision(precision)
+           << "[" << vector.x() << ", " << vector.y() << ", " << vector.z() << "]";
+    return stream.str();
+}
 
 // ROS / PCL publishing helpers
 template<typename T>
-sensor_msgs::PointCloud2 publishCloud(const ros::Publisher& thisPub, const T& thisCloud, ros::Time thisStamp, std::string thisFrame)
+sensor_msgs::PointCloud2 cloudToRosMsg(const T& thisCloud, ros::Time thisStamp, std::string thisFrame)
 {
     sensor_msgs::PointCloud2 tempCloud;
     pcl::toROSMsg(*thisCloud, tempCloud);
     tempCloud.header.stamp = thisStamp;
     tempCloud.header.frame_id = thisFrame;
-    if (thisPub.getNumSubscribers() != 0)
-        thisPub.publish(tempCloud);
+    return tempCloud;
+}
+
+template<typename T>
+sensor_msgs::PointCloud2 publishCloud(const ros::Publisher& thisPub, const T& thisCloud, ros::Time thisStamp, std::string thisFrame)
+{
+    sensor_msgs::PointCloud2 tempCloud = cloudToRosMsg(thisCloud, thisStamp, thisFrame);
+    thisPub.publish(tempCloud);
     return tempCloud;
 }
 

@@ -1,3 +1,4 @@
+/* These file directly cites the scancontext pipline: https://github.com/gisbi-kim/SC-LIO-SAM */
 #pragma once
 
 #include <ctime>

@@ -17,9 +17,9 @@
 </p>
 
 <p>
-  <img alt="Ubuntu 18.04 / 20.04" src="https://img.shields.io/badge/Ubuntu-18.04%20%7C%2020.04-E95420?logo=ubuntu&logoColor=white">
-  <img alt="ROS Melodic / Noetic" src="https://img.shields.io/badge/ROS-Melodic%20%7C%20Noetic-22314E?logo=ros&logoColor=white">
-  <img alt="C++17" src="https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white">
+  <img alt="Ubuntu 20.04 / 22.04" src="https://img.shields.io/badge/Ubuntu-20.04%20%7C%2022.04-E95420?logo=ubuntu&logoColor=white">
+  <img alt="ROS Noetic / Humeble" src="https://img.shields.io/badge/ROS-Noetic%20%7C%20Humble-22314E?logo=ros&logoColor=white">
+  <img alt="C++" src="https://img.shields.io/badge/C%2B%2B-00599C?logo=cplusplus&logoColor=white">
   <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green.svg">
 </p>
 
@@ -30,8 +30,6 @@
 ---
 
 ## Overview
-
-ROLO is a LiDAR-only SLAM system designed to reduce pose-estimation drift—especially vertical drift—when ground vehicles traverse uneven terrain. Its front end separates motion estimation into complementary stages, while its back end improves global consistency through scan-to-submap alignment and factor-graph optimization.
 
 <div align="center">
   <img src="doc/img/system_overview_00.png" alt="ROLO system overview" width="82%">
@@ -54,6 +52,7 @@ The following configurations have been tested:
 | Boost | ≥ 1.71 |
 | PCL | ≥ 1.10.0 |
 | Eigen | ≥ 3.3.7 |
+| glog  | ≥ 0.4.0 |
 | OpenVDB (Optional) | ≥ 9.1.0 (Noetic) |
 
 ROS dependencies include `autoware_rviz_msgs`, `cv_bridge`, `geometry_msgs`, `jsk_recognition_msgs`, `nav_msgs`, `pcl_ros`, `sensor_msgs`, `std_msgs`, `tf`, `tf2`, and `visualization_msgs`.
@@ -72,13 +71,15 @@ source devel/setup.bash
 
 ## Quick Start
 
-### 1. Configure the LiDAR input
+### 1. Configuration
 
-Generally, ROLO only accepts point clouds as `sensor_msgs/PointCloud2` messages, The IMU messages `sensor_msgs/Imu` is optional for accracy improvement in loose coupling.
+Generally, ROLO only accepts point clouds as `sensor_msgs/PointCloud2` messages. (Only support Velodyne, Ouster LiDAR.)
+
+The IMU messages `sensor_msgs/Imu` is optional for accracy improvement in scan deskewing and loose-coupling pose estimation. (IMU -> LiDAR extrinsics is recommended, but ROLO is insensitive to extrinsics.)
 
 Open [`config/params.yaml`](config/params.yaml) and set the point-cloud topic and sensor-related parameters for your platform. The launch file uses the `/base_link` and `/velodyne` frames by default; adjust the static transform in [`launch/rolo_run.launch`](launch/rolo_run.launch) when your frame names or extrinsics differ.
 
-### 2. Launch ROLO
+### 2. Launch ROLO System
 
 ```bash
 source ~/rolo_ws/devel/setup.bash
@@ -90,7 +91,7 @@ roslaunch rolo rolo_run.launch
 Makesure point cloud topic is in your bag file!
 
 ```bash
-rosbag play /path/to/your-bag.bag -r 1
+rosbag play /path/to/your-bag.bag --clock
 ```
 
 ## Test Data (deprecated)
@@ -114,8 +115,8 @@ The following items summarize the current public roadmap:
 
 - [x] Add SGD-based rotation registration
 - [x] Add prior pose association and scan-context loop detection
-- [ ] Add IMU support
-- [ ] Refine the core code structure
+- [x] Add IMU support
+- [x] Refine the core code structure
 - [ ] Add ROS 2 support
 - [ ] Provide additional dataset-specific configurations
 
@@ -142,8 +143,8 @@ If ROLO is useful in your research, please cite:
 ## Acknowledgements
 This project builds on ideas and open-source software from:
 
-- [FastGICP](https://github.com/SMRT-AIST/fast_gicp) — K. Koide, M. Yokozuka, S. Oishi, and A. Banno, “Voxelized GICP for Fast and Accurate 3D Point Cloud Registration,” *IEEE ICRA*, 2021.
 - [LIO-SAM](https://github.com/TixiaoShan/LIO-SAM) — T. Shan, B. Englot, D. Meyers, W. Wang, C. Ratti, and D. Rus, “LIO-SAM: Tightly-coupled Lidar Inertial Odometry via Smoothing and Mapping,” *IEEE/RSJ IROS*, 2020.
+- [FastGICP](https://github.com/SMRT-AIST/fast_gicp) — K. Koide, M. Yokozuka, S. Oishi, and A. Banno, “Voxelized GICP for Fast and Accurate 3D Point Cloud Registration,” *IEEE ICRA*, 2021.
 - [Scan Context](https://github.com/gisbi-kim/scancontext) — Kim G, Choi S, Kim A. Scan context++: Structural place recognition robust to rotation and lateral variations in urban environments[J]. IEEE Transactions on Robotics, 2021, 38(3): 1856-1874.
 
 We sincerely thank the authors and maintainers of these projects.

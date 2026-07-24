@@ -1,6 +1,8 @@
 #ifndef ROLO_REGISTRATION_HPP
 #define ROLO_REGISTRATION_HPP
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <memory>
@@ -22,6 +24,7 @@
 #endif
 
 #include <pcl/common/transforms.h>
+#include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/point_cloud.h>
 #include <pcl/search/kdtree.h>
 
@@ -762,6 +765,407 @@ private:
   std::unique_ptr<VmfVoxelMap<PointTarget>> voxelmap_;
   std::vector<std::pair<int, typename VmfVoxel::Ptr>> voxel_correspondences_;
   CovarianceVector voxel_mahalanobis_;
+};
+
+template <typename PointSource, typename PointTarget = PointSource>
+class featureICP {
+public:
+  using SourceCloud = pcl::PointCloud<PointSource>;
+  using TargetCloud = pcl::PointCloud<PointTarget>;
+  using SourceCloudConstPtr = typename SourceCloud::ConstPtr;
+  using TargetCloudConstPtr = typename TargetCloud::ConstPtr;
+
+  struct Config {
+    int edge_feature_min_valid_num = 10;
+    int surf_feature_min_valid_num = 100;
+    int minimum_optimization_points = 50;
+    int max_iterations = 30;
+    int number_of_cores = 1;
+    float nearest_search_sq_dist = 1.0f;
+    float line_eigenvalue_ratio = 3.0f;
+    float plane_valid_threshold = 0.2f;
+    float residual_weight = 0.9f;
+    float min_constraint_weight = 0.1f;
+    float rotation_converge_deg = 0.05f;
+    float translation_converge_cm = 0.05f;
+    std::array<float, 6> degeneracy_thresholds{{100.0f, 100.0f, 100.0f, 100.0f, 100.0f, 100.0f}};
+  };
+
+  struct Result {
+    bool has_enough_features = false;
+    bool optimized = false;
+    bool converged = false;
+    bool degenerate = false;
+    int iterations = 0;
+    int constraints = 0;
+  };
+
+  void setConfig(const Config& config) {
+    config_ = config;
+  }
+
+  bool hasDegenerated() const {
+    return is_degenerate_;
+  }
+
+  Result align(const SourceCloudConstPtr& corner_source,
+               const SourceCloudConstPtr& surf_source,
+               const TargetCloudConstPtr& corner_target,
+               const TargetCloudConstPtr& surf_target,
+               float transform[6]) {
+    Result result;
+    is_degenerate_ = false;
+    projection_matrix_.setIdentity();
+
+    if (!corner_source || !surf_source || !corner_target || !surf_target) {
+      return result;
+    }
+
+    result.has_enough_features =
+        static_cast<int>(corner_source->size()) > config_.edge_feature_min_valid_num &&
+        static_cast<int>(surf_source->size()) > config_.surf_feature_min_valid_num;
+    if (!result.has_enough_features || corner_target->size() < 5 || surf_target->size() < 5) {
+      return result;
+    }
+
+    pcl::KdTreeFLANN<PointTarget> corner_tree;
+    pcl::KdTreeFLANN<PointTarget> surf_tree;
+    corner_tree.setInputCloud(corner_target);
+    surf_tree.setInputCloud(surf_target);
+
+    std::array<float, 6> pose;
+    std::copy(transform, transform + 6, pose.begin());
+
+    for (int iter = 0; iter < config_.max_iterations; ++iter) {
+      std::vector<PointSource> selected_points;
+      std::vector<PointSource> selected_coeffs;
+      collectCornerCoefficients(*corner_source, *corner_target, corner_tree, pose, selected_points, selected_coeffs);
+      collectSurfCoefficients(*surf_source, *surf_target, surf_tree, pose, selected_points, selected_coeffs);
+
+      result.constraints = static_cast<int>(selected_points.size());
+      bool converged = false;
+      if (!optimizePose(iter, selected_points, selected_coeffs, pose, &converged)) {
+        break;
+      }
+
+      result.optimized = true;
+      result.iterations = iter + 1;
+      result.converged = converged;
+      if (converged) {
+        break;
+      }
+    }
+
+    std::copy(pose.begin(), pose.end(), transform);
+    result.degenerate = is_degenerate_;
+    return result;
+  }
+
+private:
+  int threadCount() const {
+#ifdef _OPENMP
+    return config_.number_of_cores == 0 ? omp_get_max_threads() : std::max(1, config_.number_of_cores);
+#else
+    return 1;
+#endif
+  }
+
+  int threadIndex() const {
+#ifdef _OPENMP
+    return omp_get_thread_num();
+#else
+    return 0;
+#endif
+  }
+
+  Eigen::Affine3f poseToAffine(const std::array<float, 6>& pose) const {
+    return pcl::getTransformation(pose[3], pose[4], pose[5], pose[0], pose[1], pose[2]);
+  }
+
+  PointSource transformPoint(const PointSource& point, const Eigen::Affine3f& transform) const {
+    PointSource out = point;
+    out.x = transform(0, 0) * point.x + transform(0, 1) * point.y + transform(0, 2) * point.z + transform(0, 3);
+    out.y = transform(1, 0) * point.x + transform(1, 1) * point.y + transform(1, 2) * point.z + transform(1, 3);
+    out.z = transform(2, 0) * point.x + transform(2, 1) * point.y + transform(2, 2) * point.z + transform(2, 3);
+    return out;
+  }
+
+  PointTarget makeTargetQuery(const PointSource& point) const {
+    PointTarget query;
+    query.x = point.x;
+    query.y = point.y;
+    query.z = point.z;
+    return query;
+  }
+
+  void appendThreadResults(const std::vector<std::vector<PointSource>>& points_by_thread,
+                           const std::vector<std::vector<PointSource>>& coeffs_by_thread,
+                           std::vector<PointSource>& points,
+                           std::vector<PointSource>& coeffs) const {
+    for (std::size_t i = 0; i < points_by_thread.size(); ++i) {
+      points.insert(points.end(), points_by_thread[i].begin(), points_by_thread[i].end());
+      coeffs.insert(coeffs.end(), coeffs_by_thread[i].begin(), coeffs_by_thread[i].end());
+    }
+  }
+
+  void collectCornerCoefficients(const SourceCloud& source,
+                                 const TargetCloud& target,
+                                 pcl::KdTreeFLANN<PointTarget>& tree,
+                                 const std::array<float, 6>& pose,
+                                 std::vector<PointSource>& selected_points,
+                                 std::vector<PointSource>& selected_coeffs) const {
+    const int num_threads = threadCount();
+    const Eigen::Affine3f transform = poseToAffine(pose);
+    std::vector<std::vector<PointSource>> points_by_thread(num_threads);
+    std::vector<std::vector<PointSource>> coeffs_by_thread(num_threads);
+
+#pragma omp parallel for num_threads(num_threads) schedule(guided, 8)
+    for (int i = 0; i < static_cast<int>(source.size()); ++i) {
+      std::vector<int> indices;
+      std::vector<float> sq_distances;
+      const PointSource point_ori = source.points[i];
+      const PointSource point_sel = transformPoint(point_ori, transform);
+      if (tree.nearestKSearch(makeTargetQuery(point_sel), 5, indices, sq_distances) < 5 ||
+          sq_distances[4] >= config_.nearest_search_sq_dist) {
+        continue;
+      }
+
+      Eigen::Vector3f centroid = Eigen::Vector3f::Zero();
+      for (int j = 0; j < 5; ++j) {
+        centroid += target.points[indices[j]].getVector3fMap();
+      }
+      centroid /= 5.0f;
+
+      Eigen::Matrix3f covariance = Eigen::Matrix3f::Zero();
+      for (int j = 0; j < 5; ++j) {
+        const Eigen::Vector3f delta = target.points[indices[j]].getVector3fMap() - centroid;
+        covariance += delta * delta.transpose();
+      }
+      covariance /= 5.0f;
+
+      Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(covariance);
+      if (solver.info() != Eigen::Success ||
+          solver.eigenvalues()(2) <= config_.line_eigenvalue_ratio * solver.eigenvalues()(1)) {
+        continue;
+      }
+
+      const Eigen::Vector3f line_dir = solver.eigenvectors().col(2);
+      const Eigen::Vector3f point = point_sel.getVector3fMap();
+      const Eigen::Vector3f line_point_a = centroid + 0.1f * line_dir;
+      const Eigen::Vector3f line_point_b = centroid - 0.1f * line_dir;
+      const Eigen::Vector3f line_vec = line_point_a - line_point_b;
+      const float line_len = line_vec.norm();
+      if (line_len < 1e-6f) {
+        continue;
+      }
+
+      const Eigen::Vector3f cross = (point - line_point_a).cross(point - line_point_b);
+      const float distance = cross.norm() / line_len;
+      if (distance < 1e-6f) {
+        continue;
+      }
+
+      const Eigen::Vector3f coeff_vec = (line_vec.cross(cross) / (distance * line_len)).eval();
+      const float weight = 1.0f - config_.residual_weight * std::fabs(distance);
+      if (weight <= config_.min_constraint_weight) {
+        continue;
+      }
+
+      PointSource coeff;
+      coeff.x = weight * coeff_vec.x();
+      coeff.y = weight * coeff_vec.y();
+      coeff.z = weight * coeff_vec.z();
+      coeff.intensity = weight * distance;
+
+      const int thread_num = threadIndex();
+      points_by_thread[thread_num].push_back(point_ori);
+      coeffs_by_thread[thread_num].push_back(coeff);
+    }
+
+    appendThreadResults(points_by_thread, coeffs_by_thread, selected_points, selected_coeffs);
+  }
+
+  void collectSurfCoefficients(const SourceCloud& source,
+                               const TargetCloud& target,
+                               pcl::KdTreeFLANN<PointTarget>& tree,
+                               const std::array<float, 6>& pose,
+                               std::vector<PointSource>& selected_points,
+                               std::vector<PointSource>& selected_coeffs) const {
+    const int num_threads = threadCount();
+    const Eigen::Affine3f transform = poseToAffine(pose);
+    std::vector<std::vector<PointSource>> points_by_thread(num_threads);
+    std::vector<std::vector<PointSource>> coeffs_by_thread(num_threads);
+
+#pragma omp parallel for num_threads(num_threads) schedule(guided, 8)
+    for (int i = 0; i < static_cast<int>(source.size()); ++i) {
+      std::vector<int> indices;
+      std::vector<float> sq_distances;
+      const PointSource point_ori = source.points[i];
+      const PointSource point_sel = transformPoint(point_ori, transform);
+      if (tree.nearestKSearch(makeTargetQuery(point_sel), 5, indices, sq_distances) < 5 ||
+          sq_distances[4] >= config_.nearest_search_sq_dist) {
+        continue;
+      }
+
+      Eigen::Matrix<float, 5, 3> A;
+      Eigen::Matrix<float, 5, 1> b;
+      b.fill(-1.0f);
+      for (int j = 0; j < 5; ++j) {
+        A(j, 0) = target.points[indices[j]].x;
+        A(j, 1) = target.points[indices[j]].y;
+        A(j, 2) = target.points[indices[j]].z;
+      }
+
+      Eigen::Vector3f normal = A.colPivHouseholderQr().solve(b);
+      float plane_offset = 1.0f;
+      const float normal_norm = normal.norm();
+      if (normal_norm < 1e-6f) {
+        continue;
+      }
+      normal /= normal_norm;
+      plane_offset /= normal_norm;
+
+      bool plane_valid = true;
+      for (int j = 0; j < 5; ++j) {
+        const Eigen::Vector3f target_point = target.points[indices[j]].getVector3fMap();
+        if (std::fabs(normal.dot(target_point) + plane_offset) > config_.plane_valid_threshold) {
+          plane_valid = false;
+          break;
+        }
+      }
+      if (!plane_valid) {
+        continue;
+      }
+
+      const float distance = normal.dot(point_sel.getVector3fMap()) + plane_offset;
+      const float range_sq = point_ori.x * point_ori.x + point_ori.y * point_ori.y + point_ori.z * point_ori.z;
+      const float range_weight = std::sqrt(std::sqrt(std::max(range_sq, 1e-6f)));
+      const float weight = 1.0f - config_.residual_weight * std::fabs(distance) / range_weight;
+      if (weight <= config_.min_constraint_weight) {
+        continue;
+      }
+
+      PointSource coeff;
+      coeff.x = weight * normal.x();
+      coeff.y = weight * normal.y();
+      coeff.z = weight * normal.z();
+      coeff.intensity = weight * distance;
+
+      const int thread_num = threadIndex();
+      points_by_thread[thread_num].push_back(point_ori);
+      coeffs_by_thread[thread_num].push_back(coeff);
+    }
+
+    appendThreadResults(points_by_thread, coeffs_by_thread, selected_points, selected_coeffs);
+  }
+
+  bool optimizePose(int iter,
+                    const std::vector<PointSource>& selected_points,
+                    const std::vector<PointSource>& selected_coeffs,
+                    std::array<float, 6>& pose,
+                    bool* converged) {
+    *converged = false;
+    const int point_num = static_cast<int>(selected_points.size());
+    if (point_num < config_.minimum_optimization_points) {
+      return false;
+    }
+
+    const float srx = std::sin(pose[1]);
+    const float crx = std::cos(pose[1]);
+    const float sry = std::sin(pose[2]);
+    const float cry = std::cos(pose[2]);
+    const float srz = std::sin(pose[0]);
+    const float crz = std::cos(pose[0]);
+
+    Eigen::MatrixXf A(point_num, 6);
+    Eigen::VectorXf b(point_num);
+    for (int i = 0; i < point_num; ++i) {
+      PointSource point_ori;
+      point_ori.x = selected_points[i].y;
+      point_ori.y = selected_points[i].z;
+      point_ori.z = selected_points[i].x;
+
+      PointSource coeff;
+      coeff.x = selected_coeffs[i].y;
+      coeff.y = selected_coeffs[i].z;
+      coeff.z = selected_coeffs[i].x;
+      coeff.intensity = selected_coeffs[i].intensity;
+
+      const float arx = (crx * sry * srz * point_ori.x + crx * crz * sry * point_ori.y - srx * sry * point_ori.z) * coeff.x
+                      + (-srx * srz * point_ori.x - crz * srx * point_ori.y - crx * point_ori.z) * coeff.y
+                      + (crx * cry * srz * point_ori.x + crx * cry * crz * point_ori.y - cry * srx * point_ori.z) * coeff.z;
+
+      const float ary = ((cry * srx * srz - crz * sry) * point_ori.x
+                      + (sry * srz + cry * crz * srx) * point_ori.y + crx * cry * point_ori.z) * coeff.x
+                      + ((-cry * crz - srx * sry * srz) * point_ori.x
+                      + (cry * srz - crz * srx * sry) * point_ori.y - crx * sry * point_ori.z) * coeff.z;
+
+      const float arz = ((crz * srx * sry - cry * srz) * point_ori.x + (-cry * crz - srx * sry * srz) * point_ori.y) * coeff.x
+                      + (crx * crz * point_ori.x - crx * srz * point_ori.y) * coeff.y
+                      + ((sry * srz + cry * crz * srx) * point_ori.x + (crz * sry - cry * srx * srz) * point_ori.y) * coeff.z;
+
+      A(i, 0) = arz;
+      A(i, 1) = arx;
+      A(i, 2) = ary;
+      A(i, 3) = coeff.z;
+      A(i, 4) = coeff.x;
+      A(i, 5) = coeff.y;
+      b(i) = -coeff.intensity;
+    }
+
+    const Eigen::Matrix<float, 6, 6> AtA = A.transpose() * A;
+    const Eigen::Matrix<float, 6, 1> Atb = A.transpose() * b;
+    Eigen::Matrix<float, 6, 1> delta = AtA.colPivHouseholderQr().solve(Atb);
+
+    if (iter == 0) {
+      updateDegeneracyProjection(AtA);
+    }
+
+    if (is_degenerate_) {
+      delta = projection_matrix_ * delta;
+    }
+
+    for (int i = 0; i < 6; ++i) {
+      pose[i] += delta(i);
+    }
+
+    const float delta_r = std::sqrt(std::pow(radToDeg(delta(0)), 2) +
+                                    std::pow(radToDeg(delta(1)), 2) +
+                                    std::pow(radToDeg(delta(2)), 2));
+    const float delta_t = std::sqrt(std::pow(delta(3) * 100.0f, 2) +
+                                    std::pow(delta(4) * 100.0f, 2) +
+                                    std::pow(delta(5) * 100.0f, 2));
+
+    *converged = delta_r < config_.rotation_converge_deg && delta_t < config_.translation_converge_cm;
+    return true;
+  }
+
+  void updateDegeneracyProjection(const Eigen::Matrix<float, 6, 6>& hessian) {
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix<float, 6, 6>> solver(hessian);
+    if (solver.info() != Eigen::Success) {
+      is_degenerate_ = true;
+      projection_matrix_.setZero();
+      return;
+    }
+
+    Eigen::Matrix<float, 6, 6> mask = Eigen::Matrix<float, 6, 6>::Identity();
+    is_degenerate_ = false;
+    for (int i = 0; i < 6; ++i) {
+      if (solver.eigenvalues()(i) < config_.degeneracy_thresholds[i]) {
+        mask(i, i) = 0.0f;
+        is_degenerate_ = true;
+      }
+    }
+    projection_matrix_ = solver.eigenvectors() * mask * solver.eigenvectors().transpose();
+  }
+
+  float radToDeg(float radians) const {
+    return radians * 180.0f / static_cast<float>(M_PI);
+  }
+
+  Config config_;
+  bool is_degenerate_ = false;
+  Eigen::Matrix<float, 6, 6> projection_matrix_ = Eigen::Matrix<float, 6, 6>::Identity();
 };
 
 }  // namespace rolo
